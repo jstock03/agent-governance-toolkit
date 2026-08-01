@@ -79,6 +79,7 @@ without forking contract semantics, so each is filed against that repository:
 | Telemetry sink cannot be set after `Runtime` construction | [#22](https://github.com/responsibleai/agent-control-spec/issues/22) |
 | `from_url`, `policy_labels`, `validate_overlay` have no equivalent | [#23](https://github.com/responsibleai/agent-control-spec/issues/23) |
 | Bindings expose only `AcsInterceptor` | [#14](https://github.com/responsibleai/agent-control-spec/issues/14) |
+| No trusted publishing, repository metadata or org owner on crates.io | [#24](https://github.com/responsibleai/agent-control-spec/issues/24) |
 
 ### Security, unresolved
 
@@ -171,6 +172,26 @@ now describes the implemented contract throughout. The AgentDojo benchmark polic
 computes its own redacted value and returns a single `transform`. The transform a
 host applies is revalidated against `Limits`, and `manifest_from_url` refuses
 loopback and link-local destinations again.
+
+That last guard covers the URL a caller passes and nothing deeper. A nested
+`extends` URL inside a fetched manifest resolves through the loader in
+`agent-control-spec`, which has no equivalent check, and the guard resolves the
+host once rather than revalidating after DNS resolution or a redirect. Both sit
+in the same upstream gap as issue #20, so treat the guard as a barrier against
+the obvious case and not as a boundary.
+
+### Before this merges
+
+`agent-control-spec` on crates.io carries no repository metadata, uses no trusted
+publishing, and has one individual owner, and 0.4.0-alpha.1 was published from a
+personal API key. `agent-hooks-sdk` publishes from GitHub Actions through trusted
+publishing and records the repository, the workflow run and the commit. The
+0.4.0-alpha.1 artifact matches `responsibleai/agent-control-spec` at that tag
+today, so the question is what a later publish could carry rather than what this
+one does. Since the crate ships an enforcement engine, a divergent publish would
+change what a governance decision means. Filed upstream as
+[#24](https://github.com/responsibleai/agent-control-spec/issues/24), and worth
+holding the merge for.
 
 The Rust crates carrying the break moved to 0.4.0-beta.0, matching `sdk/rust`.
 The npm package did not. Its `optionalDependencies` pin the per-platform native
