@@ -137,7 +137,7 @@ class AgentDojoPolicy:
             "effects": [
                 {
                     "type": "redact",
-                    "path": "$policy_target",
+                    "path": "$target",
                     "spans": redaction_spans,
                 }
             ],
