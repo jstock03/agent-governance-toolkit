@@ -25,7 +25,7 @@ Input -> Model -> Tool Call -> Tool Result -> Output
 ## Example manifest
 
 ```yaml
-agent_control_specification_version: "0.3.1-beta"
+agent_control_specification_version: "0.4.0-alpha.1"
 metadata:
   name: email-agent
 policies:

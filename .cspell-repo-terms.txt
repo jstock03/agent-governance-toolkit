@@ -44,6 +44,7 @@ Bradner
 CBN
 CBOR
 CCPA
+CDLL
 CISA
 CMVK
 CODEOWNERS
@@ -241,7 +242,9 @@ allowlisted
 alnum
 amannn
 anchore
+anes
 anomalyco
+anstyle
 antigravity
 apikey
 apiserver
@@ -250,6 +253,7 @@ approvable
 approvеd
 appsettings
 argparse
+argtypes
 arraycomprehension
 arrowsize
 artefacts
@@ -288,6 +292,7 @@ bubblewrap
 buildkit
 bursty
 bypassable
+byref
 bytearray
 bytecodes
 bytecount
@@ -300,6 +305,7 @@ carloshvp
 carryforward
 carveout
 casefold
+cdylib
 cedarling
 cedarpy
 cedarschema
@@ -357,6 +363,7 @@ crossstate
 crun
 cstr
 cstring
+ctypes
 custodied
 cutover
 dalek
@@ -387,6 +394,7 @@ dids
 digestmod
 displaydoc
 dkwargs
+dlopen
 dnssec
 doesnotexist
 domaintenantid
@@ -400,6 +408,7 @@ eastus
 egresspolicy
 elif
 elts
+embedder
 embedders
 emnapi
 endswith
@@ -664,6 +673,7 @@ offence
 omitempty
 oncall
 oneshot
+oorandom
 opencode
 openpolicyagent
 openshell
@@ -751,6 +761,7 @@ recompiles
 redactions
 redef
 rederive
+rederived
 rederives
 redteam
 reemits
@@ -771,7 +782,10 @@ resear
 reserialize
 reshapeable
 responsibleai
+restype
+retarget
 retargeted
+retargets
 returncode
 rfile
 rfind
@@ -790,6 +804,7 @@ runbooks
 runsc
 rustc
 rustdecimal
+rustix
 rustls
 rustup
 sagaorchestrator
@@ -883,6 +898,7 @@ thiserror
 timedelta
 tinyrainbow
 tinystr
+tinytemplate
 tlsv
 tmpfs
 toolkits
@@ -963,4 +979,5 @@ yamls
 zerofrom
 zerotrie
 zerovec
+zmij
 zoneinfo
