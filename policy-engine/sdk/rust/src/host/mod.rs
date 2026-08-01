@@ -94,11 +94,80 @@ pub fn default_host_policy_dispatcher(
 /// rather than the system temporary directory. ACS performs the HTTPS trust
 /// checks, bounded fetch, redirect handling, optional SHA-256 verification,
 /// and recursive `extends` resolution.
+/// Return true for IP destinations a manifest URL fetch must not target.
+///
+/// Prevents server side request forgery to the host itself or to a cloud
+/// metadata endpoint. Loopback, the unspecified address, the IPv4 broadcast
+/// address, and link-local (IPv4 169.254.0.0/16 including 169.254.169.254, and
+/// IPv6 fe80::/10) are blocked. RFC1918 and IPv6 unique-local are deliberately
+/// allowed so internal HTTPS policy hosting keeps working. IPv4-mapped
+/// (`::ffff:a.b.c.d`) and IPv4-compatible (`::a.b.c.d`) literals canonicalize
+/// to their embedded IPv4 first, so a dual-stack host cannot route past the
+/// guard through `[::ffff:169.254.169.254]`.
+///
+/// Ported from the engine AGT vendored before the retarget;
+/// `agent-control-spec` 0.4.0-alpha.1 validates only scheme, credentials and
+/// fragment. Filed upstream as agent-control-spec#20.
+fn is_blocked_fetch_ip(ip: std::net::IpAddr) -> bool {
+    fn blocked_v4(v4: std::net::Ipv4Addr) -> bool {
+        v4.is_loopback() || v4.is_link_local() || v4.is_unspecified() || v4.is_broadcast()
+    }
+    match ip {
+        std::net::IpAddr::V4(v4) => blocked_v4(v4),
+        std::net::IpAddr::V6(v6) => {
+            // Native IPv6 specials first: to_ipv4 would map ::1 to 0.0.0.1
+            // and let it through.
+            if v6.is_loopback() || v6.is_unspecified() || (v6.segments()[0] & 0xffc0) == 0xfe80 {
+                return true;
+            }
+            if let Some(v4) = v6.to_ipv4_mapped() {
+                return blocked_v4(v4);
+            }
+            if let Some(v4) = v6.to_ipv4() {
+                return blocked_v4(v4);
+            }
+            false
+        }
+    }
+}
+
+/// Reject a URL whose host is a literal IP the fetch guard blocks.
+///
+/// Only literal addresses are checked. A hostname that resolves to a blocked
+/// address still passes, which is the same coverage the pre-retarget engine
+/// had: closing that needs resolution-time interception in the fetcher.
+fn reject_blocked_fetch_host(url: &str) -> Result<(), RuntimeError> {
+    let host = url
+        .split("://")
+        .nth(1)
+        .and_then(|rest| rest.split(['/', '?', '#']).next())
+        .map(|authority| authority.rsplit('@').next().unwrap_or(authority))
+        .unwrap_or_default();
+    let host = host.rsplit_once(':').map_or(host, |(h, port)| {
+        if port.chars().all(|c| c.is_ascii_digit()) && !h.is_empty() {
+            h
+        } else {
+            host
+        }
+    });
+    let bare = host.trim_start_matches('[').trim_end_matches(']');
+    if let Ok(ip) = bare.parse::<std::net::IpAddr>() {
+        if is_blocked_fetch_ip(ip) {
+            return Err(RuntimeError::ManifestInvalid(format!(
+                "URL '{url}' targets a loopback or link-local address, which is blocked to \
+                 prevent SSRF to a host-local or cloud metadata endpoint"
+            )));
+        }
+    }
+    Ok(())
+}
+
 pub fn manifest_from_url(
     url: &str,
     sha256: Option<&str>,
     limits: Limits,
 ) -> Result<Manifest, RuntimeError> {
+    reject_blocked_fetch_host(url)?;
     // A URL `extends` never resolves against the base directory, so this
     // synthetic manifest can live in the system temp dir. Writing it into
     // the working directory would fail on a read-only checkout and would
@@ -364,16 +433,20 @@ impl AgentControl {
         mode: EnforcementMode,
     ) -> HostEvaluation {
         let engine = self.runtime.evaluate_point(intervention_point, snapshot);
-        HostEvaluation::from_engine(intervention_point, engine, mode).unwrap_or_else(
-            |(error, detail)| HostEvaluation {
+        let limits = self
+            .parts
+            .as_ref()
+            .map(|parts| parts.limits)
+            .unwrap_or_default();
+        HostEvaluation::from_engine_with_limits(intervention_point, engine, mode, limits)
+            .unwrap_or_else(|(error, detail)| HostEvaluation {
                 verdict: agent_hooks::Verdict::host_error(error, Some(detail)),
                 policy_input: None,
                 transformed_policy_target: None,
                 action_identity: None,
                 input_identity: None,
                 enforced_identity: None,
-            },
-        )
+            })
     }
 
     /// Resolves an intervention point result into proceed, block, or suspend.

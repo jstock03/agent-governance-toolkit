@@ -160,43 +160,15 @@ the process.
 
 ## Work remaining in this repository
 
-Things AGT must close. Found by review, not yet done; each is real, and none is a
-silent assumption.
+`SPECIFICATION.md` sections beyond the verdict set, host obligations, approval
+path and reason tables were retargeted alongside them, so the normative document
+now describes the implemented contract throughout. The AgentDojo benchmark policy
+computes its own redacted value and returns a single `transform`. The transform a
+host applies is revalidated against `Limits`, and `manifest_from_url` refuses
+loopback and link-local destinations again.
 
-- **`manifest_from_url` lost the old URL trust gate.** Delegating to the crate's
-  `extends` fetcher restores fetching and sha256 pinning, but not the loopback and
-  link-local rejection the removed loader enforced, and not the restriction on a URL
-  sourced manifest naming local `bundle` and `data` paths. Upstream validates only
-  scheme, credentials and fragment. Until that is restored, do not point
-  `manifest_from_url` at an untrusted URL. Same root cause as the dropped `url_sourced`
-  provenance gate above.
-- **A transform is not revalidated against `Limits`.** `HostEvaluation::from_engine`
-  applies the transform without the resource budget, so a transform can grow the
-  effective snapshot past `max_snapshot_bytes` for the current call. `SPECIFICATION.md`
-  section 16 requires the transformed snapshot to be revalidated. The next `evaluate`
-  does validate its own snapshot, so this bounds one call, not the session. Closing it
-  means threading `Limits` into `from_engine`, which changes its signature.
-- **The AgentDojo benchmark policy still emits the retired shape.**
-  `benchmarks/agentdojo/acs_agentdojo_bench/policy.py` returns `warn` plus an `effects[]`
-  array; the pinned engine rejects that as `runtime_error:policy_output_invalid`.
-  Translating it means computing the redacted string in the policy and returning a single
-  `transform`, as `integrations/annotators/tests/moderation_flow.rs` does. Benchmark
-  numbers produced before that lands are not valid.
-- **`SPECIFICATION.md` is only partly retargeted.** The verdict set, host obligations,
-  approval path and reserved reason tables now match the implementation. Other sections
-  still describe the runtime as applying transforms and computing identities. Retargeting
-  the whole normative document is its own piece of work.
-
-### Package versions need a release decision
-
-`core` moved to 0.3.2-beta.0 and `sdk/rust` to 0.4.0-beta.0, but `sdk/python`,
-`sdk/node` and the five `integrations/*` crates still declare 0.3.1-beta.0 while carrying
-breaking changes: three verdicts instead of five, new `warnings` and `approval` members on
-the verdict, and renamed reserved reasons. Choosing their published versions is a release
-decision, and the Node CI job asserts the packed tarball name
-(`agent-control-specification-0.3.1-beta.0.tgz`), so a bump has to move
-`.github/workflows/policy-engine-ci.yml` and pass the generator drift check in
-`scripts/ci/generate_workflows.py`.
+Nothing here is knowingly outstanding. What remains is upstream, in the table
+above.
 
 ## The .NET SDK
 

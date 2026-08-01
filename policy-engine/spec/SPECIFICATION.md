@@ -44,7 +44,7 @@ This section defines the terms this document uses with a specific meaning. Every
 
 **Verdict.** The normalized decision the engine returns, one of `allow`, `deny`, or `transform`, together with a reason. The set is closed. A policy MAY still express the intents `warn` and `escalate`; the engine normalizes `warn` to `allow` plus a `warnings[]` entry and `escalate` to a `deny` carrying an `approval` block, which section 17 calls a liftable `deny`.
 
-**Transform.** A replacement the runtime applies to the policy target, carried by a `transform` verdict, to produce the transformed policy target.
+**Transform.** A replacement carried by a `transform` verdict. The engine returns it and the host applies it to the policy target, producing the transformed policy target.
 
 **Mode.** The binding setting of an evaluation request, either `enforce` or `evaluate_only`, defined in section 5.
 
@@ -332,7 +332,7 @@ The runtime treats `evidence` as opaque. It does not validate `artefact` and doe
 
 ## 14. Transform
 
-A `transform` verdict carries a single replacement that the runtime applies to the policy target and to nothing else. The `transform` body has two members.
+A `transform` verdict carries a single replacement that applies to the policy target and to nothing else. The engine returns it unapplied; applying it is a host obligation under section 17. The `transform` body has two members.
 
 | Field | Required | Type | Constraint |
 | --- | --- | --- | --- |
@@ -343,7 +343,7 @@ The runtime resolves `path` against the current policy target and replaces the v
 
 A `transform` whose `path` is rooted outside `$target` MUST fail closed with `runtime_error:transform_target_forbidden`. A `transform` whose `path` cannot be parsed, whose `path` does not resolve against the policy target, whose `value` cannot be set because of a path type mismatch, or whose `value` member is missing MUST fail closed with `runtime_error:transform_invalid`.
 
-In `enforce` mode the runtime applies the transform and the result is the transformed policy target. In `evaluate_only` mode the runtime validates the transform but applies none and returns no transformed policy target.
+In `enforce` mode the host applies the transform and the result is the transformed policy target. In `evaluate_only` mode the host validates the transform but applies none and returns no transformed policy target, so a shadow run surfaces a transform that could not resolve rather than hiding it until the first enforced request.
 
 `transform` is the only form of value rewriting a verdict can request. A host that needs multi step rewriting at one intervention point expresses it by chaining intervention points, for example an annotator at `pre_model_call` produces sanitized text under `annotations.<name>` and the bound policy reads from that annotation.
 
@@ -437,7 +437,7 @@ The runtime trusts the snapshot the host supplies. It does not authenticate the 
 
 Annotations are untrusted signal. An annotator observes potentially adversarial content such as a user prompt or a tool result. A policy MUST treat annotation values as data and MUST NOT let them widen authority. A failed annotator fails closed, so an annotator failure cannot silently allow an action.
 
-A `transform` verdict is bounded to the policy target. The runtime applies a transform only within `$target` and rejects any `transform` path rooted outside it, so a policy cannot use a transform to reach the snapshot, the projected tool, or host state.
+A `transform` verdict is bounded to the policy target. A transform applies only within `$target`, and a `transform` path rooted outside it is rejected, so a policy cannot use a transform to reach the snapshot, the projected tool, or host state. The engine rejects an out-of-target path during normalization; the host rejects one that arrives at an interception point where the contract permits no transform.
 
 Approvals bind to `enforced_identity`. A liftable `deny` is approved against the `enforced_identity` of the action that will execute, and the SDK rederives that identity before proceeding and fails closed on a mismatch. This prevents an approval granted for one action from authorizing a different action and closes a time of check to time of use gap.
 

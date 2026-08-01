@@ -1018,3 +1018,35 @@ fn with_telemetry_emits_one_decision_event_per_evaluation() {
     // Free-text reason is reduced to a safe code by the core redaction helper.
     assert_eq!(events[0].reason_code.as_deref(), Some("blocked"));
 }
+
+#[test]
+fn manifest_from_url_blocks_ssrf_targets() {
+    // Every form the pre-retarget engine blocked, including the dual-stack
+    // bypasses that motivated the IPv4 canonicalization.
+    for url in [
+        "https://127.0.0.1/m.yaml",
+        "https://169.254.169.254/latest/meta-data",
+        "https://[::1]/m.yaml",
+        "https://[::ffff:169.254.169.254]/m.yaml",
+        "https://[::ffff:127.0.0.1]/m.yaml",
+        "https://0.0.0.0/m.yaml",
+        "https://255.255.255.255/m.yaml",
+        "https://user:pw@127.0.0.1:8443/m.yaml",
+    ] {
+        let error = crate::manifest_from_url(url, None, crate::Limits::default())
+            .expect_err(&format!("{url} must be refused"));
+        assert!(
+            error.to_string().contains("loopback or link-local"),
+            "{url} gave {error}"
+        );
+    }
+
+    // RFC1918 stays allowed so internal policy hosting keeps working: this
+    // one fails at the fetch, not at the guard.
+    let error = crate::manifest_from_url("https://10.0.0.5/m.yaml", None, crate::Limits::default())
+        .expect_err("unreachable host still errors");
+    assert!(
+        !error.to_string().contains("loopback or link-local"),
+        "RFC1918 must not be blocked by the guard: {error}"
+    );
+}

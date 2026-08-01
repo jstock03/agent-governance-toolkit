@@ -11,7 +11,7 @@
 //! rebuilds the richer result the SDK surfaces to callers.
 
 use agent_control_spec::{
-    Decision, EnforcementMode, EvaluationResult, InterceptionPoint, JsonValue,
+    Decision, EnforcementMode, EvaluationResult, InterceptionPoint, JsonValue, Limits,
 };
 use sha2::{Digest, Sha256};
 use std::fmt::Write as _;
@@ -48,6 +48,22 @@ impl HostEvaluation {
         point: InterceptionPoint,
         result: EvaluationResult,
         mode: EnforcementMode,
+    ) -> Result<Self, (agent_hooks::HostError, String)> {
+        Self::from_engine_with_limits(point, result, mode, Limits::default())
+    }
+
+    /// As [`from_engine`](Self::from_engine), but revalidates the transformed
+    /// policy target against `limits`.
+    ///
+    /// The engine checks the snapshot it was given, before the transform
+    /// existed. Applying one is host work, so a transform that grows the
+    /// target past `max_snapshot_bytes` would otherwise leave the host
+    /// carrying a value the engine would have refused.
+    pub fn from_engine_with_limits(
+        point: InterceptionPoint,
+        result: EvaluationResult,
+        mode: EnforcementMode,
+        limits: Limits,
     ) -> Result<Self, (agent_hooks::HostError, String)> {
         let EvaluationResult {
             verdict,
@@ -107,6 +123,12 @@ impl HostEvaluation {
                     ),
                 })?;
                 if mode == EnforcementMode::Enforce {
+                    limits.validate_snapshot(&applied).map_err(|error| {
+                        (
+                            agent_hooks::HostError::TransformInvalid,
+                            format!("transform result exceeds the configured limits: {error}"),
+                        )
+                    })?;
                     Some(applied)
                 } else {
                     None
@@ -279,6 +301,40 @@ mod tests {
                 err.0
             );
         }
+    }
+
+    #[test]
+    fn a_transform_past_the_snapshot_limit_fails_closed() {
+        // The engine validated the pre-transform snapshot. Applying the
+        // transform is host work, so growing the target past the budget has
+        // to be caught here or not at all.
+        let big = "x".repeat(4096);
+        let transform = agent_hooks::Transform {
+            path: "$target.text".to_string(),
+            value: json!(big),
+        };
+        let limits = Limits {
+            max_snapshot_bytes: 256,
+            ..Limits::default()
+        };
+        let err = HostEvaluation::from_engine_with_limits(
+            InterceptionPoint::Output,
+            engine_result(Decision::Transform, Some(transform.clone())),
+            EnforcementMode::Enforce,
+            limits,
+        )
+        .unwrap_err();
+        assert!(matches!(err.0, agent_hooks::HostError::TransformInvalid));
+
+        // The same transform under the default budget is fine, so the
+        // rejection is the limit and not the transform.
+        HostEvaluation::from_engine_with_limits(
+            InterceptionPoint::Output,
+            engine_result(Decision::Transform, Some(transform)),
+            EnforcementMode::Enforce,
+            Limits::default(),
+        )
+        .expect("default limits admit it");
     }
 
     #[test]
