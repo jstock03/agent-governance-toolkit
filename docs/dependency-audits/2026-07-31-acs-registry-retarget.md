@@ -20,11 +20,17 @@ Two first-party crates are added, both exact-pinned:
 | Crate | Version | Why |
 | --- | --- | --- |
 | `agent-control-spec` | 0.4.0-alpha.1 | The extracted engine, replacing `policy-engine/core` |
-| `agent-hooks-sdk` | 0.1.0-alpha.4 | The control contract that defines the verdicts, interception points, and reserved reason namespaces |
+| `agent-hooks-sdk` | 0.1.0-alpha.3 | The control contract that defines the verdicts, interception points, and reserved reason namespaces |
 
 Both are published on crates.io. Verified against the registry API at the
 versions above rather than assumed, which is also why they are added to
 `REGISTERED_CARGO_PACKAGES` in `scripts/check_dependency_confusion.py`.
+
+`agent-hooks-sdk` is pinned one alpha behind the newest release. `agent-control-spec`
+requires only `^0.1.0-alpha.3`, and 0.1.0-alpha.4 was published two days ago, inside
+the seven day cooling off window. The 0.1.0-alpha.3 release is fourteen days old, so
+it satisfies both the dependency and the rule. The workspace builds and its 108 tests
+pass against it.
 
 The third-party movement is net negative in `agent-governance-rust` and close
 to flat in `policy-engine`.

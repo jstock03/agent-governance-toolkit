@@ -5,8 +5,13 @@ AGT's policy decision runtime is no longer vendored here. It ships from the regi
 control contract. This note records what changed, what is still open, and what a
 contributor needs to know before touching the policy plane.
 
-Pinned version: `agent-control-spec = "=0.4.0-alpha.1"`, which resolves
-`agent-hooks-sdk 0.1.0-alpha.4`.
+Pinned versions: `agent-control-spec = "=0.4.0-alpha.1"` and
+`agent-hooks-sdk = "=0.1.0-alpha.3"`. `agent-hooks-sdk` sits one alpha behind the
+newest release on purpose. `agent-control-spec` asks only for `^0.1.0-alpha.3`, and
+the seven day cooling off rule in `scripts/check_release_age.py` rejects a crate
+published two days ago, so the older release is both sufficient and the more
+conservative choice. Move the pin when the newer alpha ages past the threshold and
+something in this tree needs it.
 
 ## What moved
 
