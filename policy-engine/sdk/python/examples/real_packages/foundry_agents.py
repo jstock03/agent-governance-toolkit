@@ -139,7 +139,7 @@ def build_control() -> AgentControl:
     """
     azure = require_azure()
     manifest = {
-        "agent_control_specification_version": "0.3.1-beta",
+        "agent_control_specification_version": "0.4.0-alpha.1",
         "metadata": {"name": "foundry-governed-agent"},
         "annotators": {
             "intent_judge": {
