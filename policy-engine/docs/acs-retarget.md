@@ -167,8 +167,14 @@ computes its own redacted value and returns a single `transform`. The transform 
 host applies is revalidated against `Limits`, and `manifest_from_url` refuses
 loopback and link-local destinations again.
 
-Nothing here is knowingly outstanding. What remains is upstream, in the table
-above.
+The Rust crates carrying the break moved to 0.4.0-beta.0, matching `sdk/rust`.
+The npm package did not. Its `optionalDependencies` pin the per-platform native
+packages, and the supply-chain audit resolves those against the live registry, so
+a version that is not published yet fails the gate. That bump belongs to the
+release, not to this change.
+
+Nothing else here is knowingly outstanding. What remains is upstream, in the
+table above.
 
 ## The .NET SDK
 
