@@ -10,7 +10,7 @@ description = "async-openai chat tool-call guard backed by Agent Control Specifi
 doctest = false
 
 [dependencies]
-agent_control_specification = { version = "0.4.0-beta.0", path = "../../sdk/rust" }
+agent_control_specification = { path = "../../sdk/rust" }
 async-openai = { version = "0.34", features = ["chat-completion-types"] }
 serde_json = "1"
 
