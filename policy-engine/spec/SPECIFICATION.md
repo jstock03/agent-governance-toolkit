@@ -69,7 +69,7 @@ A manifest MUST be validated before any evaluation uses it. A manifest that fail
 
 ### 2.1 Version
 
-`agent_control_specification_version` MUST be a non empty string. This document describes the value `0.3.1-beta`.
+`agent_control_specification_version` MUST be a non empty string. This document describes the value `0.4.0-alpha.1`.
 
 ### 2.2 extends
 
