@@ -274,9 +274,9 @@ def test_unknown_reason_at_governed_point_fails_closed() -> None:
 
 
 def test_session_cache_is_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
-    import agent_control_specification._adapters.agent_hooks as adapter_module
-
-    monkeypatch.setattr(adapter_module, "_MAX_SESSIONS", 2)
+    monkeypatch.setattr(
+        "agent_control_specification._adapters.agent_hooks._MAX_SESSIONS", 2
+    )
     acs, _ = _make(*[_ipr(Decision.ALLOW) for _ in range(4)])
     for index in range(4):
         acs.intercept(

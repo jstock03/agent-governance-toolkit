@@ -53,6 +53,7 @@ def ensure_model_available() -> bool:
             if resp.status == 200:
                 return True
     except OSError:
+        # Endpoint unreachable (Ollama down/not installed); fall through to guidance.
         pass
     print(
         f"Local model endpoint {_OLLAMA_BASE_URL} is unreachable.\n"
