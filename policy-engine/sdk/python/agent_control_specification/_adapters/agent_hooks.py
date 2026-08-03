@@ -235,7 +235,7 @@ class AcsInterceptor:
                 point through.
         """
         self._session_factory = session_factory
-        self._sessions: OrderedDict[str, _Session] = OrderedDict()
+        self._sessions: OrderedDict[tuple[str, str], _Session] = OrderedDict()
         self._lock = threading.Lock()
         self._governed_points = governed_points
 
@@ -347,7 +347,8 @@ class AcsInterceptor:
         tenant = _as_mapping(context.get("tenant"))
         tenant_raw = tenant.get("id")
         tenant_id = tenant_raw if isinstance(tenant_raw, str) else None
-        key = f"{session_id}\x00{agent_id}"
+        # Tuple key avoids delimiter-injection collisions between untrusted ids.
+        key = (session_id, agent_id)
         with self._lock:
             session = self._sessions.get(key)
             if session is None:

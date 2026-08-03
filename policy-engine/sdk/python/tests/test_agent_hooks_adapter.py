@@ -290,6 +290,15 @@ def test_session_cache_is_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
     assert len(acs._sessions) <= 2  # pyright: ignore[reportPrivateUsage]
 
 
+def test_session_cache_keys_resist_delimiter_injection() -> None:
+    # Two (session, agent) pairs that a \x00-delimited string key would collapse
+    # into one entry must resolve to separate sessions.
+    acs, _ = _make(_ipr(Decision.ALLOW), _ipr(Decision.ALLOW))
+    acs.intercept(_ctx("input", agent={"id": "c"}, session={"id": "a\x00b"}))
+    acs.intercept(_ctx("input", agent={"id": "b\x00c"}, session={"id": "a"}))
+    assert len(acs._sessions) == 2  # pyright: ignore[reportPrivateUsage]
+
+
 # --- unit: snapshot translation ----------------------------------------------
 
 
