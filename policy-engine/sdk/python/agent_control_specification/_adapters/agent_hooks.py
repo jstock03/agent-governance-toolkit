@@ -96,6 +96,11 @@ _CONTENT_ENVELOPE_POINTS: frozenset[str] = frozenset(
     {"input", "output", "post_model_call"}
 )
 
+# Post-action points whose completion advances host-side budget counters. Their
+# resource use is real, so it is recorded even when the point is not governed --
+# otherwise the budgets that governed points read would under-count.
+_BUDGET_POINTS: frozenset[str] = frozenset({"post_tool_call", "post_model_call"})
+
 _GENERIC_DENY_MESSAGE = "Request blocked by Agent Control Specification."
 
 # ACS fails closed on an intervention point a manifest does not declare, tagging
@@ -296,7 +301,10 @@ class AcsInterceptor:
             return _deny(_REASON_CONTEXT_INVALID, _GENERIC_DENY_MESSAGE)
 
         if self._governed_points is not None and point not in self._governed_points:
-            # The manifest does not govern this point; pass the action through.
+            # Not governed here, but resource use at post_* points must still
+            # advance the budget counters that governed points read.
+            if point in _BUDGET_POINTS:
+                self._record_budget(point, context, self._session(context))
             return {"decision": "allow"}
 
         session = self._session(context)
@@ -322,6 +330,8 @@ class AcsInterceptor:
             # undeclared point is "not governed", not denied. When the governed
             # set IS known, a governed point's deny stays a deny -- a policy that
             # fails to bind must fail closed, never open.
+            if point in _BUDGET_POINTS:
+                self._record_budget(point, context, session)
             return {"decision": "allow"}
 
         self._record_budget(point, context, session)

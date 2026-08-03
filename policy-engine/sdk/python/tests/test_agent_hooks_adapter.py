@@ -351,6 +351,28 @@ def test_budget_tracking_advances_tool_calls() -> None:
     assert pre_snap["envelope"]["budgets"]["tool_call_count"] == 1
 
 
+def test_ungoverned_post_tool_call_still_records_budget() -> None:
+    # A host that governs only pre_tool_call must still see the tool call from
+    # the ungoverned post_tool_call in the next governed snapshot's budgets.
+    acs, runtime = _make(
+        _ipr(Decision.ALLOW), governed_points=frozenset({"pre_tool_call"})
+    )
+    allow = acs.intercept(
+        _ctx(
+            "post_tool_call",
+            tool_call={"name": "s", "args": {}, "id": "c1"},
+            tool_result={"value": "ok"},
+        )
+    )
+    assert allow == {"decision": "allow"}
+    assert runtime.requests == []  # ungoverned: never evaluated
+    acs.intercept(
+        _ctx("pre_tool_call", tool_call={"name": "s", "args": {}, "id": "c2"})
+    )
+    pre_snap = runtime.requests[0].snapshot
+    assert pre_snap["envelope"]["budgets"]["tool_call_count"] == 1
+
+
 # --- integration: real native runtime over the shipped example manifests -----
 
 
