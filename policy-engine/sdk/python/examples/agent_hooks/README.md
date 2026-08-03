@@ -17,7 +17,7 @@ with use_agent_hooks(acs):  # 2. inject into the crew
 ```
 
 `AcsInterceptor` bridges ACS to the framework-neutral
-[agent-hooks](https://github.com/microsoft/agent-hooks) contract that crewAI
+[agent-hooks](https://github.com/responsibleai/agent-hooks) contract that crewAI
 already speaks. Because the bridge targets agent-hooks (not crewAI directly),
 the *same* interceptor governs any agent-hooks host — crewAI today, other
 frameworks tomorrow.
