@@ -32,10 +32,26 @@ def pathspecs_for_extensions(extensions: Iterable[str]) -> list[str]:
 
 
 def extract_added_lines(diff_text: str) -> str:
-    """Extract only added content lines from a unified diff."""
+    """Extract only added content lines from a unified diff.
+
+    The `+++ b/path` file header is skipped by position rather than by prefix.
+    A prefix test cannot tell it apart from a genuinely added line whose own
+    content starts with `++`, which arrives as `+++...` and would be dropped:
+    the content would then never be checked, and a check that silently skips
+    input fails in the direction of missing what it exists to find. File
+    headers only appear before the first `@@` hunk of each file, so tracking
+    whether a hunk is open distinguishes them exactly.
+    """
     added_lines: list[str] = []
+    in_hunk = False
     for line in diff_text.splitlines():
-        if line.startswith("+++"):
+        if line.startswith("@@"):
+            in_hunk = True
+            continue
+        if line.startswith("diff --git "):
+            in_hunk = False
+            continue
+        if not in_hunk and line.startswith("+++"):
             continue
         if line.startswith("+"):
             added_lines.append(line[1:])
