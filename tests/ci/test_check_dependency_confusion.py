@@ -89,6 +89,15 @@ def test_sh_known_package_is_not_flagged(tmp_path: Path) -> None:
     assert check_dep_conf.check_file(path) == []
 
 
+def test_sh_agt_evidence_is_not_flagged(tmp_path: Path) -> None:
+    path = _write(
+        tmp_path,
+        "build.sh",
+        "#!/usr/bin/env bash\npip install agt-evidence\n",
+    )
+    assert check_dep_conf.check_file(path) == []
+
+
 def test_sh_editable_path_install_is_not_flagged(tmp_path: Path) -> None:
     path = _write(
         tmp_path,
@@ -96,6 +105,12 @@ def test_sh_editable_path_install_is_not_flagged(tmp_path: Path) -> None:
         "#!/usr/bin/env bash\npip install --no-cache-dir -e agent-governance-python/agt-policies\n",
     )
     assert check_dep_conf.check_file(path) == []
+
+
+def test_find_links_directory_is_not_a_package() -> None:
+    assert check_dep_conf.extract_package_names(
+        "--find-links dist-coherence dist-coherence/*.whl"
+    ) == []
 
 
 def test_python_printed_pip_install_text_is_not_flagged(tmp_path: Path) -> None:

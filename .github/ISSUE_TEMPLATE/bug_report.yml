@@ -12,6 +12,7 @@ body:
       label: Package
       description: Which package is affected?
       options:
+        - agt-evidence
         - agent-governance-toolkit-core
         - agent-primitives
         - agent-os

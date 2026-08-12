@@ -5,6 +5,7 @@ on:
     branches:
       - main
     paths:
+      - "agent-governance-python/agt-evidence/**"
       - "agent-governance-python/agent-governance-toolkit-core/**"
       - "agent-governance-python/agent-os/**"
       - "policy-engine/sdk/python/**"
@@ -14,6 +15,7 @@ on:
       - "tests/e2e_python/**"
       - ".github/actions/**"
       - ".github/workflows/**"
+      - "!agent-governance-python/agt-evidence/**/*.md"
       - "!agent-governance-python/agent-governance-toolkit-core/**/*.md"
       - "!agent-governance-python/agent-governance-toolkit-core/**/docs/**"
       - "!agent-governance-python/agent-os/**/*.md"
@@ -21,6 +23,7 @@ on:
       - "!tests/e2e_python/**/*.md"
   pull_request:
     paths:
+      - "agent-governance-python/agt-evidence/**"
       - "agent-governance-python/agent-governance-toolkit-core/**"
       - "agent-governance-python/agent-os/**"
       - "policy-engine/sdk/python/**"
@@ -30,6 +33,7 @@ on:
       - "tests/e2e_python/**"
       - ".github/actions/**"
       - ".github/workflows/**"
+      - "!agent-governance-python/agt-evidence/**/*.md"
       - "!agent-governance-python/agent-governance-toolkit-core/**/*.md"
       - "!agent-governance-python/agent-governance-toolkit-core/**/docs/**"
       - "!agent-governance-python/agent-os/**/*.md"
@@ -80,6 +84,7 @@ jobs:
           set -euo pipefail
           python -m pip install --upgrade pip==24.3.1
           python -m pip install \
+            -e agent-governance-python/agt-evidence \
             -e agent-governance-python/agent-governance-toolkit-core \
             ./policy-engine/sdk/python \
             pytest==9.0.3 \

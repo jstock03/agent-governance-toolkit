@@ -14,6 +14,7 @@ cd $SRC/agent-governance-toolkit
 # from local source with --no-deps so the subsequent shim installs resolve
 # without reaching out to PyPI for the unpublished names.
 pip3 install --no-deps \
+    ./agent-governance-python/agt-evidence \
     ./agent-governance-python/agent-governance-toolkit-core \
     ./agent-governance-python/agent-governance-toolkit-cli \
     ./agent-governance-python/agent-governance-toolkit-integrations \

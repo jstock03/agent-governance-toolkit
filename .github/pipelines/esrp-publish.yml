@@ -71,6 +71,8 @@ parameters:
     type: object
     displayName: 'Python packages to publish'
     default:
+      - name: agt-evidence
+        path: agent-governance-python/agt-evidence
       # Consolidated distributions (v4.0.0)
       - name: agent-governance-toolkit-core
         path: agent-governance-python/agent-governance-toolkit-core
@@ -268,10 +270,47 @@ stages:
     dependsOn: []
     condition: or(eq('${{ parameters.target }}', 'pypi'), eq('${{ parameters.target }}', 'all'))
     jobs:
+      - job: Build_PyPI_Evidence_Dependency
+        displayName: 'Build agt-evidence'
+        steps:
+          - checkout: self
+
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '${{ parameters.pythonVersion }}'
+            displayName: 'Use Python ${{ parameters.pythonVersion }}'
+
+          - script: |
+              python -m pip install --no-cache-dir --disable-pip-version-check \
+                --require-hashes --no-deps \
+                -r $(Build.SourcesDirectory)/.github/release-tools/release-tools.txt
+            displayName: 'Install build tools (hash-pinned)'
+
+          - script: python -m build
+            workingDirectory: 'agent-governance-python/agt-evidence'
+            displayName: 'Build agt-evidence'
+
+          - script: |
+              echo "=== Built artifacts for agt-evidence ==="
+              ls -la dist/
+              if ! ls dist/*.whl 1>/dev/null 2>&1; then
+                echo "##[error]No wheel (.whl) found"
+                exit 1
+              fi
+            workingDirectory: 'agent-governance-python/agt-evidence'
+            displayName: 'Validate agt-evidence build artifacts'
+
+          - task: PublishPipelineArtifact@1
+            inputs:
+              targetPath: 'agent-governance-python/agt-evidence/dist'
+              artifact: 'pypi-agt-evidence'
+              publishLocation: 'pipeline'
+            displayName: 'Publish agt-evidence artifacts'
+
       - ${{ each pkg in parameters.pypiPackages }}:
         - job: Build_PyPI_${{ replace(pkg.name, '-', '_') }}
           displayName: 'Build ${{ pkg.name }}'
-          condition: and(succeeded(), ne('${{ pkg.name }}', 'agent-control-specification'))
+          condition: and(succeeded(), ne('${{ pkg.name }}', 'agent-control-specification'), ne('${{ pkg.name }}', 'agt-evidence'))
           steps:
             - checkout: self
 
@@ -651,41 +690,84 @@ stages:
               publishLocation: 'pipeline'
             displayName: 'Publish complete ACS Python distribution'
 
-  # All PyPI packages publish in parallel after build completes.
-  - stage: Publish_PyPI
-    displayName: 'Publish All Packages to PyPI'
+  # Publish the evidence dependency first. Core and compliance declare it as a
+  # required dependency, so releasing them before this stage succeeds would
+  # create temporarily uninstallable package versions.
+  - stage: Publish_PyPI_Evidence
+    displayName: 'Publish agt-evidence to PyPI'
     dependsOn: Build_PyPI
     condition: and(succeeded(), eq('${{ parameters.dryRun }}', false), or(eq('${{ parameters.target }}', 'pypi'), eq('${{ parameters.target }}', 'all')))
     jobs:
-      - ${{ each pkg in parameters.pypiPackages }}:
-        - job: Publish_PyPI_${{ replace(pkg.name, '-', '_') }}
-          displayName: 'Publish ${{ pkg.name }} to PyPI'
-          steps:
-            - task: DownloadPipelineArtifact@2
-              inputs:
-                artifact: 'pypi-${{ pkg.name }}'
-                targetPath: '$(Pipeline.Workspace)/dist-${{ pkg.name }}'
-              displayName: 'Download ${{ pkg.name }} artifacts'
+      - job: Publish_PyPI_agt_evidence
+        displayName: 'Publish agt-evidence to PyPI'
+        steps:
+          - task: DownloadPipelineArtifact@2
+            inputs:
+              artifact: 'pypi-agt-evidence'
+              targetPath: '$(Pipeline.Workspace)/dist-agt-evidence'
+            displayName: 'Download agt-evidence artifacts'
 
-            - task: EsrpRelease@11
-              displayName: 'ESRP Publish ${{ pkg.name }} to PyPI'
-              retryCountOnTaskFailure: 2
-              inputs:
-                connectedservicename: 'AGT-ESRP-Signing'
-                usemanagedidentity: true
-                keyvaultname: '$(ESRP_KEYVAULT_NAME)'
-                signcertname: '$(ESRP_RELEASE_CERT_IDENTIFIER)'
-                clientid: '$(ESRP_CLIENT_ID)'
-                intent: 'PackageDistribution'
-                contenttype: 'PyPi'
-                contentsource: 'Folder'
-                folderlocation: '$(Pipeline.Workspace)/dist-${{ pkg.name }}'
-                waitforreleasecompletion: true
-                owners: '$(ESRP_OWNERS)'
-                approvers: '$(ESRP_APPROVERS)'
-                serviceendpointurl: 'https://api.esrp.microsoft.com'
-                mainpublisher: 'ESRPRELPACMAN'
-                domaintenantid: '$(MICROSOFT_TENANT_ID)'
+          - task: EsrpRelease@11
+            displayName: 'ESRP Publish agt-evidence to PyPI'
+            retryCountOnTaskFailure: 2
+            inputs:
+              connectedservicename: 'AGT-ESRP-Signing'
+              usemanagedidentity: true
+              keyvaultname: '$(ESRP_KEYVAULT_NAME)'
+              signcertname: '$(ESRP_RELEASE_CERT_IDENTIFIER)'
+              clientid: '$(ESRP_CLIENT_ID)'
+              intent: 'PackageDistribution'
+              contenttype: 'PyPi'
+              contentsource: 'Folder'
+              folderlocation: '$(Pipeline.Workspace)/dist-agt-evidence'
+              waitforreleasecompletion: true
+              owners: '$(ESRP_OWNERS)'
+              approvers: '$(ESRP_APPROVERS)'
+              serviceendpointurl: 'https://api.esrp.microsoft.com'
+              mainpublisher: 'ESRPRELPACMAN'
+              domaintenantid: '$(MICROSOFT_TENANT_ID)'
+
+  - stage: Publish_PyPI
+    displayName: 'Publish Remaining Packages to PyPI'
+    dependsOn: Publish_PyPI_Evidence
+    condition: and(succeeded(), eq('${{ parameters.dryRun }}', false), or(eq('${{ parameters.target }}', 'pypi'), eq('${{ parameters.target }}', 'all')))
+    jobs:
+      - job: Publish_PyPI_Complete
+        displayName: 'Finalize PyPI publication stage'
+        steps:
+          - script: echo "Dependency-ordered PyPI publication complete"
+            displayName: 'Confirm publication ordering'
+
+      - ${{ each pkg in parameters.pypiPackages }}:
+        - ${{ if ne(pkg.name, 'agt-evidence') }}:
+          - job: Publish_PyPI_${{ replace(pkg.name, '-', '_') }}
+            displayName: 'Publish ${{ pkg.name }} to PyPI'
+            steps:
+              - task: DownloadPipelineArtifact@2
+                inputs:
+                  artifact: 'pypi-${{ pkg.name }}'
+                  targetPath: '$(Pipeline.Workspace)/dist-${{ pkg.name }}'
+                displayName: 'Download ${{ pkg.name }} artifacts'
+
+              - task: EsrpRelease@11
+                displayName: 'ESRP Publish ${{ pkg.name }} to PyPI'
+                retryCountOnTaskFailure: 2
+                inputs:
+                  connectedservicename: 'AGT-ESRP-Signing'
+                  usemanagedidentity: true
+                  keyvaultname: '$(ESRP_KEYVAULT_NAME)'
+                  signcertname: '$(ESRP_RELEASE_CERT_IDENTIFIER)'
+                  clientid: '$(ESRP_CLIENT_ID)'
+                  intent: 'PackageDistribution'
+                  contenttype: 'PyPi'
+                  contentsource: 'Folder'
+                  folderlocation: '$(Pipeline.Workspace)/dist-${{ pkg.name }}'
+                  waitforreleasecompletion: true
+                  owners: '$(ESRP_OWNERS)'
+                  approvers: '$(ESRP_APPROVERS)'
+                  serviceendpointurl: 'https://api.esrp.microsoft.com'
+                  mainpublisher: 'ESRPRELPACMAN'
+                  domaintenantid: '$(MICROSOFT_TENANT_ID)'
 
   # =======================================================
   # NPM — AGT packages plus ACS SDK/native support packages

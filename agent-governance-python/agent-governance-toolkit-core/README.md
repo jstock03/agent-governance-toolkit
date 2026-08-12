@@ -27,6 +27,10 @@ pip install agent-governance-toolkit-core[full]
 pip install agent-governance-toolkit-core[iatp,observability]
 ```
 
+The core package depends on `agt-evidence` for durable audit records and
+integrity sinks. Existing `agentmesh.governance` audit imports remain
+compatible.
+
 ## Migration from old packages
 
 If you previously installed any of the five packages listed above, replace them

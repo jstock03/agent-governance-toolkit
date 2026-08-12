@@ -47,8 +47,9 @@ python -m venv .venv
 source .venv/bin/activate        # Linux/macOS
 # .venv\Scripts\activate         # Windows
 
-# Install the core package from the local source to avoid dependency conflicts
-# (Required for all local development to ensure you test against local core changes)
+# Install shared packages from local source to avoid dependency conflicts.
+# Evidence must be installed first because core and compliance depend on it.
+pip install --no-cache-dir --no-deps -e agt-evidence
 pip install --no-cache-dir --no-deps -e agent-governance-toolkit-core
 
 # Install the package you are working on in editable mode
@@ -297,7 +298,8 @@ git clone https://github.com/microsoft/agent-governance-toolkit.git
 cd agent-governance-toolkit
 
 # Install in development mode
-# Install the core package from the local source to avoid dependency conflicts
+# Install shared packages from local source to avoid dependency conflicts
+pip install --no-cache-dir --no-deps -e "agent-governance-python/agt-evidence"
 pip install --no-cache-dir --no-deps -e "agent-governance-python/agent-governance-toolkit-core"
 
 pip install -e "agent-governance-python/agent-primitives[dev]"
@@ -358,10 +360,10 @@ and has a different cycle-time cost.
 **Local prerequisites:**
 
 - **Python 3.10+** (CI tests on 3.10, 3.11, 3.12, and 3.13)
-- **pytest** — `pip install pytest` (or install the package's dev extras)
-- **ruff** — `pip install ruff==0.12.4` (matches `agent-governance-python/requirements/ci-lint.txt`)
+- **pytest**, installed through the package's dev extras or the CI requirements
+- **ruff 0.12.4**, matching `agent-governance-python/requirements/ci-lint.txt`
 - **Docker** with Compose v2 — required for step 3
-- For a given package, run `pip install -e .` from inside the package
+- For a given package, install it in editable mode from inside the package
   directory before its first `pytest`. Sibling packages (e.g.
   `agent-mesh`) may also need to be installed when their canonical
   modules are imported by the package under test. Step 3's Docker flow

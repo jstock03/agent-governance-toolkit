@@ -1,6 +1,6 @@
 ---
 title: Packages
-last_reviewed: 2026-08-03
+last_reviewed: 2026-08-12
 owner: docs-team
 ---
 
@@ -35,11 +35,28 @@ pip install "agent-governance-toolkit[openai-agents]"
 
 Source: `agent-governance-python/agent-compliance`
 
+## Governance evidence
+
+`agt-evidence` contains durable audit records, Merkle and HMAC integrity
+verification, external audit sinks, trace correlation identifiers, and the
+`agt-runtime-evidence/v1` deployment manifest loader.
+
+```bash
+pip install agt-evidence
+```
+
+Operational metrics, dashboards, SLOs, SBOM generation, and artifact signing
+remain outside this package because they have different retention and trust
+semantics.
+
+Source: `agent-governance-python/agt-evidence`
+
 ## Python core
 
-`agent-governance-toolkit-core` contains policy, trust, identity, audit, and
-runtime primitives. It provides the current implementation behind the legacy
-`agent_os`, `agentmesh`, runtime, and hypervisor imports.
+`agent-governance-toolkit-core` contains policy, trust, identity, and runtime
+primitives. It depends on `agt-evidence` for durable audit contracts and
+provides the current implementation behind the legacy `agent_os`, `agentmesh`,
+runtime, and hypervisor imports.
 
 ```bash
 pip install agent-governance-toolkit-core

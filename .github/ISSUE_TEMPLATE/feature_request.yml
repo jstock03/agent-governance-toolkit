@@ -12,6 +12,7 @@ body:
       label: Package
       description: Which package would this feature apply to?
       options:
+        - agt-evidence
         - agent-governance-toolkit-core
         - agent-primitives
         - agent-os

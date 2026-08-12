@@ -45,7 +45,6 @@ GOVERNANCE_MODULES = [
     "agent_os.integrations.compat",
     "agentmesh.governance.policy",
     "agentmesh.governance.conflict_resolution",
-    "agentmesh.governance.audit",
     "agentmesh.governance.opa",
     "agentmesh.governance.compliance",
     "agentmesh.governance.shadow",
@@ -54,14 +53,25 @@ GOVERNANCE_MODULES = [
     "agentmesh.identity.rotation",
     "agentmesh.trust.cards",
     "agentmesh.storage.file_trust_store",
+    "agt_evidence",
+    "agt_evidence.audit",
+    "agt_evidence.backends",
+    "agentmesh.governance.audit",
+    "agentmesh.governance.audit_backends",
 ]
 
 # Critical functions whose bytecode we hash for runtime tamper detection
 CRITICAL_FUNCTIONS = [
     ("agentmesh.governance.policy", "PolicyEngine.evaluate"),
     ("agentmesh.governance.conflict_resolution", "PolicyConflictResolver.resolve"),
-    ("agentmesh.governance.audit", "AuditChain.add_entry"),
     ("agentmesh.trust.cards", "CardRegistry.is_verified"),
+    ("agt_evidence.audit", "AuditChain.add_entry"),
+    ("agt_evidence.audit", "AuditEntry.compute_hash"),
+    ("agt_evidence.backends", "SignedAuditEntry.verify"),
+    ("agt_evidence.backends", "HashChainVerifier.verify_file"),
+    ("agt_evidence", "AuditLog.log"),
+    ("agentmesh.governance.audit", "AuditLog.log"),
+    ("agentmesh.governance.audit_backends", "HashChainVerifier.verify_file"),
 ]
 
 

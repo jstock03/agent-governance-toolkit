@@ -18,6 +18,7 @@ from typing import Any
 
 
 PYPI_PACKAGES = [
+    ("agt-evidence", "agent-governance-python/agt-evidence", "github-actions"),
     ("agent-governance-toolkit-core", "agent-governance-python/agent-governance-toolkit-core", "github-actions"),
     ("agent-governance-toolkit-integrations", "agent-governance-python/agent-governance-toolkit-integrations", "github-actions"),
     ("agent-governance-toolkit-cli", "agent-governance-python/agent-governance-toolkit-cli", "github-actions"),

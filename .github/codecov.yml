@@ -17,6 +17,10 @@ comment:
   require_changes: true
 
 flags:
+  agt-evidence:
+    paths:
+      - agent-governance-python/agt-evidence/
+    carryforward: true
   agent-os:
     paths:
       - agent-governance-python/agent-os/

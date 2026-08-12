@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from agentmesh.governance.audit import AuditEntry, AuditLog, AuditChain
+from agt_evidence import AuditChain, AuditEntry, AuditLog
 
 
 class AuditService:

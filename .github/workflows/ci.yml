@@ -39,6 +39,7 @@ jobs:
           filters: |
             python:
               - 'policy-engine/**'
+              - 'agent-governance-python/agt-evidence/**'
               - 'agent-governance-python/agt-policies/**'
               - 'agent-governance-python/agent-os/**'
               - 'agent-governance-python/agent-mesh/**'
@@ -95,15 +96,19 @@ jobs:
             pkg-agt-policies:
               - 'policy-engine/**'
               - 'agent-governance-python/agt-policies/**'
+            pkg-agt-evidence:
+              - 'agent-governance-python/agt-evidence/**'
             pkg-agent-os:
               - 'agent-governance-python/agent-os/**'
             pkg-agent-mesh:
+              - 'agent-governance-python/agt-evidence/**'
               - 'agent-governance-python/agent-mesh/**'
             pkg-agent-hypervisor:
               - 'agent-governance-python/agent-hypervisor/**'
             pkg-agent-sre:
               - 'agent-governance-python/agent-sre/**'
             pkg-agent-compliance:
+              - 'agent-governance-python/agt-evidence/**'
               - 'agent-governance-python/agent-compliance/**'
             pkg-agent-runtime:
               - 'agent-governance-python/agent-runtime/**'
@@ -142,6 +147,7 @@ jobs:
       - name: Compose changed-py-pkgs JSON list
         id: py-pkgs
         env:
+          AE: ${{ steps.filter.outputs.pkg-agt-evidence }}
           AGP: ${{ steps.filter.outputs.pkg-agt-policies }}
           AO: ${{ steps.filter.outputs.pkg-agent-os }}
           AM: ${{ steps.filter.outputs.pkg-agent-mesh }}
@@ -159,6 +165,7 @@ jobs:
         run: |
           set -euo pipefail
           pkgs=()
+          [ "$AE" = "true" ] && pkgs+=('"agt-evidence"')
           [ "$AGP" = "true" ] && pkgs+=('"agt-policies"')
           [ "$AO" = "true" ] && pkgs+=('"agent-os"')
           [ "$AM" = "true" ] && pkgs+=('"agent-mesh"')
@@ -211,6 +218,7 @@ jobs:
       matrix:
         package:
           [
+            agt-evidence,
             agent-os,
             agt-policies,
             agent-mesh,
@@ -273,6 +281,7 @@ jobs:
       matrix:
         package:
           [
+            agt-evidence,
             agent-os,
             agt-policies,
             agent-mesh,
@@ -290,6 +299,8 @@ jobs:
           ]
         python-version: [ "3.10", "3.11", "3.12", "3.13" ]
         exclude:
+          - package: agt-evidence
+            python-version: "3.10"
           - package: agent-os
             python-version: "3.10"
           - package: agt-policies
@@ -349,6 +360,7 @@ jobs:
         run: |
           # Install consolidated packages from local source (not yet on PyPI).
           # Most packages depend on these, so install them first.
+          pip install --no-cache-dir --no-deps -e agent-governance-python/agt-evidence
           pip install --no-cache-dir --no-deps -e agent-governance-python/agent-governance-toolkit-core
           pip install --no-cache-dir --no-deps -e agent-governance-python/agent-governance-toolkit-integrations
           pip install --no-cache-dir --no-deps -e agent-governance-python/agent-governance-toolkit-cli
@@ -410,7 +422,7 @@ jobs:
             agent-compliance|agent-runtime|agent-mcp-governance)
               pip install --no-cache-dir -e .
               ;;
-            agent-os|agt-policies|agent-mesh|agent-hypervisor|agent-sre|agent-lightning|agent-primitives|agent-marketplace|agent-discovery|agent-rag-governance|agent-sandbox)
+            agt-evidence|agent-os|agt-policies|agent-mesh|agent-hypervisor|agent-sre|agent-lightning|agent-primitives|agent-marketplace|agent-discovery|agent-rag-governance|agent-sandbox)
               pip install --no-cache-dir -e ".[dev]"
               ;;
             *)
@@ -464,6 +476,7 @@ jobs:
       matrix:
         package:
           [
+            agt-evidence,
             agent-governance-toolkit-core,
             agent-governance-toolkit-integrations,
             agent-governance-toolkit-cli,
@@ -548,6 +561,7 @@ jobs:
           # tree. -core's set is the five renamed stubs; -cli's set adds
           # agent-sre; -protocols' set adds agent-mcp-governance.
           for pkg in \
+            agt-evidence \
             agent-governance-toolkit-core \
             agent-hypervisor agent-mesh agent-os agent-runtime agent-primitives \
             agent-governance-toolkit-cli agent-sre \
@@ -561,10 +575,10 @@ jobs:
         run: |
           set -euo pipefail
           python -m venv /tmp/venv-core
-          /tmp/venv-core/bin/pip install --no-cache-dir \
+          /tmp/venv-core/bin/pip install --no-cache-dir --find-links dist-coherence \
             dist-coherence/agent_governance_toolkit_core-*.whl
           /tmp/venv-core/bin/python -W ignore \
-            -c "import hypervisor, agentmesh, agent_os, agent_runtime, agent_primitives; print('meta import OK')"
+            -c "import agt_evidence, hypervisor, agentmesh, agent_os, agent_runtime, agent_primitives; print('meta import OK')"
       - name: Clean-venv import — cli umbrella alone
         run: |
           set -euo pipefail
@@ -589,7 +603,7 @@ jobs:
           python -m venv /tmp/venv-all
           /tmp/venv-all/bin/pip install --no-cache-dir --find-links dist-coherence dist-coherence/*.whl
           /tmp/venv-all/bin/python -W ignore \
-            -c "import hypervisor, agentmesh, agent_os, agent_runtime, agent_primitives, agent_sre, agent_sandbox, mcp_trust_server, agent_mcp_governance, a2a_agentmesh, mcp_receipt_governed, mcp_trust_proxy; print('combined import OK')"
+            -c "import agt_evidence, hypervisor, agentmesh, agent_os, agent_runtime, agent_primitives, agent_sre, agent_sandbox, mcp_trust_server, agent_mcp_governance, a2a_agentmesh, mcp_receipt_governed, mcp_trust_proxy; print('combined import OK')"
 
   # ── Python dependency safety (only when Python files change) ──────────
   security:
@@ -614,7 +628,7 @@ jobs:
           # Install each package. A failure here means safety would scan
           # against the wrong dependency set, so surface it instead of
           # silently `|| true`-ing past it.
-          for pkg in agent-governance-toolkit-core agent-governance-toolkit-integrations agent-governance-toolkit-cli agent-governance-toolkit-protocols agent-compliance agent-discovery agent-lightning agent-marketplace agent-rag-governance; do
+          for pkg in agt-evidence agent-governance-toolkit-core agent-governance-toolkit-integrations agent-governance-toolkit-cli agent-governance-toolkit-protocols agent-compliance agent-discovery agent-lightning agent-marketplace agent-rag-governance; do
             echo "=== $pkg ==="
             (cd "agent-governance-python/$pkg" \
               && pip install --no-cache-dir -e .)  # Scorecard: pinned to repo checkout
@@ -802,6 +816,7 @@ jobs:
         run: |
           # Use local monorepo siblings so integration tests never drift against
           # the latest published wheels.
+          pip install --no-cache-dir --no-deps -e "$GITHUB_WORKSPACE/agent-governance-python/agt-evidence"
           pip install --no-cache-dir --no-deps -e "$GITHUB_WORKSPACE/agent-governance-python/agent-governance-toolkit-core"
           pip install --no-cache-dir --no-deps -e "$GITHUB_WORKSPACE/agent-governance-python/agent-governance-toolkit-integrations"
           # All agentmesh-integrations packages declare a [dev] extra (audited
@@ -937,6 +952,7 @@ jobs:
           python3 -c "
           import json, glob, sys, re
           REGISTERED = {
+              'agt-evidence',
               'agent-governance-toolkit-core','agent-governance-toolkit-integrations',
               'agent-governance-toolkit-cli','agent-governance-toolkit-protocols',
               'agent-os-kernel','agentmesh-platform','agent-hypervisor',
@@ -1288,6 +1304,7 @@ jobs:
         lint,
         test,
         build-pypi,
+        install-coherence,
         security,
         test-dotnet,
         test-integrations,

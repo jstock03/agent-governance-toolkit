@@ -1,6 +1,6 @@
 ---
 title: "Tutorial 04 — Audit Logging & Compliance"
-last_reviewed: 2026-04-26
+last_reviewed: 2026-08-12
 owner: agt-maintainers
 ---
 
@@ -27,7 +27,7 @@ The Agent Governance Toolkit gives you two complementary pieces:
 
 | Package | Install | Purpose |
 |---------|---------|---------|
-| `agentmesh-platform` | `pip install agentmesh-platform` | `AuditLog` with Merkle-chain integrity |
+| `agt-evidence` | `pip install agt-evidence` | `AuditLog` with Merkle-chain integrity |
 | `agent-governance-toolkit` | `pip install agent-governance-toolkit` | OWASP ASI 2026 compliance CLI |
 
 This tutorial walks through both, from a single log call to a CI/CD
@@ -38,7 +38,7 @@ compliance gate.
 ## 1 — Quick Start
 
 ```python
-from agentmesh.governance.audit import AuditLog
+from agt_evidence import AuditLog
 
 # Create an in-memory audit log
 audit = AuditLog()
@@ -67,7 +67,7 @@ print("✅ Audit chain intact")
 Run it:
 
 ```bash
-pip install agentmesh-platform
+pip install agt-evidence
 python quickstart_audit.py
 ```
 
@@ -78,13 +78,13 @@ python quickstart_audit.py
 ### 2.1 Creating an AuditLog
 
 ```python
-from agentmesh.governance.audit import AuditLog
+from agt_evidence import AuditLog
 
 # In-memory only
 audit = AuditLog()
 
 # With an external sink (see §6)
-from agentmesh.governance.audit_backends import FileAuditSink
+from agt_evidence import FileAuditSink
 
 sink = FileAuditSink(path="audit.jsonl", secret_key=b"my-hmac-secret")
 audit = AuditLog(sink=sink)
@@ -229,7 +229,7 @@ Key properties:
 ### Verifying the Chain Programmatically
 
 ```python
-from agentmesh.governance.audit import AuditLog
+from agt_evidence import AuditLog
 
 audit = AuditLog()
 
@@ -261,7 +261,7 @@ assert proof["verified"], "Proof failed"
 A verifier who only has the root hash can confirm inclusion:
 
 ```python
-from agentmesh.governance.audit import MerkleAuditChain
+from agt_evidence import MerkleAuditChain
 
 # Auditor receives: entry_hash, proof, and published root_hash
 verified = MerkleAuditChain.verify_proof(
@@ -347,8 +347,7 @@ and defines the `AuditSink` protocol so you can write your own.
 ### 5.1 FileAuditSink — JSON-Lines on Disk
 
 ```python
-from agentmesh.governance.audit import AuditLog
-from agentmesh.governance.audit_backends import FileAuditSink
+from agt_evidence import AuditLog, FileAuditSink
 
 # Every entry is HMAC-signed and hash-chained
 sink = FileAuditSink(
@@ -391,8 +390,7 @@ Implement the `AuditSink` protocol to push entries to a database,
 message queue, or cloud service:
 
 ```python
-from agentmesh.governance.audit import AuditEntry
-from agentmesh.governance.audit_backends import AuditSink
+from agt_evidence import AuditEntry, AuditSink
 
 class PostgresSink:
     """Push audit entries to a PostgreSQL table."""
@@ -522,7 +520,7 @@ Output:
 | ASI-03 | Excessive Agency | `AgentControl` in `agent_os.integrations.base` |
 | ASI-04 | Unauthorized Escalation | `EscalationPolicy` in `agent_os.integrations.escalation` |
 | ASI-05 | Trust Boundary Violation | `CardRegistry` in `agentmesh.trust.cards` |
-| ASI-06 | Insufficient Logging | `AuditChain` in `agentmesh.governance.audit` |
+| ASI-06 | Insufficient Logging | `AuditChain` in `agt_evidence.audit` |
 | ASI-07 | Insecure Identity | `AgentIdentity` in `agentmesh.identity.agent_id` |
 | ASI-08 | Policy Bypass | `PolicyConflictResolver` in `agentmesh.governance.conflict_resolution` |
 | ASI-09 | Supply Chain Integrity | `IntegrityVerifier` in `agent_compliance.integrity` |
@@ -595,8 +593,7 @@ import json
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-from agentmesh.governance.audit import AuditLog
-from agentmesh.governance.audit_backends import FileAuditSink
+from agt_evidence import AuditLog, FileAuditSink
 from agent_compliance.verify import GovernanceVerifier
 from agent_compliance.integrity import IntegrityVerifier
 
@@ -699,7 +696,7 @@ jobs:
 
       - name: Install governance packages
         run: |
-          pip install agentmesh-platform agent-governance
+          pip install agt-evidence agent-governance-toolkit
 
       - name: Generate integrity manifest
         run: agt integrity --generate integrity.json

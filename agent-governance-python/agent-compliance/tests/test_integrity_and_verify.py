@@ -37,6 +37,32 @@ _CUSTOM_VERIFY_CONTROLS = {
 }
 
 
+def test_evidence_implementation_is_integrity_protected() -> None:
+    assert OWASP_ASI_CONTROLS["ASI-06"] == {
+        "name": "Insufficient Logging",
+        "module": "agt_evidence.audit",
+        "check": "AuditChain",
+    }
+    assert "agt_evidence.audit" in GOVERNANCE_MODULES
+    assert "agt_evidence.backends" in GOVERNANCE_MODULES
+    assert "agt_evidence" in GOVERNANCE_MODULES
+    assert "agentmesh.governance.audit" in GOVERNANCE_MODULES
+    assert "agentmesh.governance.audit_backends" in GOVERNANCE_MODULES
+    assert ("agt_evidence.audit", "AuditChain.add_entry") in CRITICAL_FUNCTIONS
+    assert ("agt_evidence.audit", "AuditEntry.compute_hash") in CRITICAL_FUNCTIONS
+    assert ("agt_evidence.backends", "SignedAuditEntry.verify") in CRITICAL_FUNCTIONS
+    assert (
+        "agt_evidence.backends",
+        "HashChainVerifier.verify_file",
+    ) in CRITICAL_FUNCTIONS
+    assert ("agt_evidence", "AuditLog.log") in CRITICAL_FUNCTIONS
+    assert ("agentmesh.governance.audit", "AuditLog.log") in CRITICAL_FUNCTIONS
+    assert (
+        "agentmesh.governance.audit_backends",
+        "HashChainVerifier.verify_file",
+    ) in CRITICAL_FUNCTIONS
+
+
 def _write_runtime_evidence(
     tmp_path: Path,
     *,

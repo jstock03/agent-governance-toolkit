@@ -16,7 +16,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from agentmesh.governance.audit_backends import FileAuditSink
+from agt_evidence import FileAuditSink
 from agentmesh.server import create_base_app, run_server
 from agentmesh.services.audit import AuditService
 

@@ -77,6 +77,8 @@ def main() -> int:
             if "agent_os/integrations/_native_adapter_runtime.py" not in names:
                 raise RuntimeError("core wheel is missing the native adapter runtime")
             metadata = _metadata(archive)
+            if "Requires-Dist: agt-evidence" not in metadata:
+                raise RuntimeError("core wheel does not declare agt-evidence")
             if "Requires-Dist: agt-policies" not in metadata:
                 raise RuntimeError("core wheel does not declare agt-policies")
 

@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
 
-from .audit import AuditLog
+from agt_evidence import AuditLog
 from .trace_model import TRACE_EAT_PROFILE
 
 _SUBJECT_RE = re.compile(r"^(spiffe://|did:)")

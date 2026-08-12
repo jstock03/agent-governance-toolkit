@@ -48,6 +48,7 @@ jobs:
 
       - name: Install native manifest linter
         run: |
+          pip install --no-cache-dir --no-deps -e agent-governance-python/agt-evidence
           pip install --no-cache-dir -e agent-governance-python/agent-compliance
           pip install --no-cache-dir --no-deps -e agent-governance-python/agt-policies
 
@@ -114,6 +115,7 @@ jobs:
       - name: Install native manifest test dependencies
         if: needs.changes.outputs.policies == 'true'
         run: |
+          pip install --no-cache-dir --no-deps -e agent-governance-python/agt-evidence
           pip install --no-cache-dir -e agent-governance-python/agent-compliance
           pip install --no-cache-dir --no-deps -e agent-governance-python/agt-policies
           pip install --no-cache-dir --require-hashes -r "$GITHUB_WORKSPACE/agent-governance-python/requirements/ci-policy-test.txt"

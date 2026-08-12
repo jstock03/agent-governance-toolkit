@@ -1,6 +1,6 @@
 ---
 title: "Tutorial 17 — Advanced Trust & Behavior Monitoring"
-last_reviewed: 2026-04-11
+last_reviewed: 2026-08-12
 owner: agt-maintainers
 ---
 
@@ -994,7 +994,7 @@ For production use, attach a `FileAuditSink` that writes HMAC-signed,
 hash-chained JSONL to disk:
 
 ```python
-from agentmesh.governance.audit_backends import FileAuditSink, HashChainVerifier
+from agt_evidence import FileAuditSink, HashChainVerifier
 
 sink = FileAuditSink(
     path="audit/events.jsonl",
@@ -1003,7 +1003,7 @@ sink = FileAuditSink(
 )
 
 # Create an AuditLog with the sink attached
-from agentmesh.governance.audit import AuditLog
+from agt_evidence import AuditLog
 
 log = AuditLog(sink=sink)
 log.log("agent_action", "did:mesh:worker-007", "file_read",

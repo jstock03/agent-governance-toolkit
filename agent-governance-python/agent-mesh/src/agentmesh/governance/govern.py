@@ -27,7 +27,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable, Optional, Union
 
 from .policy import Policy, PolicyDecision, PolicyEngine
-from .audit import AuditLog
+from agt_evidence import AuditLog
 from .trace_sink import TraceConfig, TRACEAuditSink
 from .approval import ApprovalHandler, ApprovalRequest, AutoRejectApproval
 from .advisory import AdvisoryCheck, AdvisoryDecision

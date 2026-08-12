@@ -25,6 +25,12 @@ pip install agent-governance-toolkit[openai-agents]
 pip install agent-governance-toolkit[full]
 ```
 
+Durable audit and deployment evidence is also available independently:
+
+```
+pip install agt-evidence
+```
+
 `agent_os` is the legacy compatibility import from the old `agent-os-kernel`
 surface. It currently emits a `DeprecationWarning`; use
 `agent-governance-toolkit-core` (or the `[full]` extra) as the replacement
@@ -48,8 +54,14 @@ It is not for applications or dashboards, demos or examples, monorepo-only produ
 
 ## Current Packages
 
-`agent-compliance/`, `agent-discovery/`, `agent-hypervisor/`, `agent-lightning/`, `agent-marketplace/`, `agent-mcp-governance/`, `agent-mesh/`, `agent-os/`, `agent-primitives/`, `agent-rag-governance/`, `agent-runtime/`, `agent-sandbox/`, `agent-sre/`, `agentmesh-integrations/`
+`agt-evidence/`, `agent-compliance/`, `agent-discovery/`, `agent-hypervisor/`, `agent-lightning/`, `agent-marketplace/`, `agent-mcp-governance/`, `agent-mesh/`, `agent-os/`, `agent-primitives/`, `agent-rag-governance/`, `agent-runtime/`, `agent-sandbox/`, `agent-sre/`, `agentmesh-integrations/`
 
-## Package Consolidation (v4.1.0 — Complete)
+## Package consolidation
 
-As of v4.1.0, 45 packages have been consolidated into 5 top-level distributions: `agent-governance-toolkit-core`, `agent-governance-toolkit-runtime`, `agent-governance-toolkit-sre`, `agent-governance-toolkit-cli`, and the `agent-governance-toolkit[full]` meta-package. See [issue #2482](https://github.com/microsoft/agent-governance-toolkit/issues/2482) for details. The consolidation plan, audit data, and migration guide are in `docs/package-consolidation/`. Previous package names remain installable as stub packages that redirect to the consolidated distributions.
+The earlier consolidation reduced the Python surface to
+`agent-governance-toolkit-core`, `agent-governance-toolkit-integrations`,
+`agent-governance-toolkit-cli`, `agent-governance-toolkit-protocols`, and the
+toolkit meta-package. `agt-evidence` starts the next boundary pass by extracting
+durable governance evidence from the core runtime while preserving legacy
+imports. The earlier plan, audit data, and migration guide remain in
+`docs/package-consolidation/`.

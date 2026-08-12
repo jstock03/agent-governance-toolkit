@@ -15,7 +15,7 @@ from typing import Any, Optional
 from pydantic import BaseModel, Field
 
 from agentmesh.constants import TRUST_SCORE_DEFAULT, TRUST_SCORE_MAX
-from agentmesh.governance.audit import AuditLog
+from agt_evidence import AuditLog
 from agentmesh.governance.policy import PolicyEngine
 from agentmesh.identity.agent_id import AgentIdentity
 from agentmesh.reward.scoring import TrustScore

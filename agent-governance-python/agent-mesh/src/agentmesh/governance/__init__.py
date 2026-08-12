@@ -44,12 +44,14 @@ from .conflict_resolution import (
     ResolutionResult,
 )
 from .compliance import ComplianceEngine, ComplianceFramework, ComplianceReport
-from .audit import AuditLog, AuditEntry, AuditChain
-from .audit_backends import (
+from agt_evidence import (
+    AuditChain,
+    AuditEntry,
+    AuditLog,
     AuditSink,
-    SignedAuditEntry,
     FileAuditSink,
     HashChainVerifier,
+    SignedAuditEntry,
     StdoutAuditSink,
 )
 from .shadow import ShadowMode, ShadowResult
@@ -239,4 +241,3 @@ __all__ = [
     "TrustRecord",
     "session_to_trust_record",
 ]
-

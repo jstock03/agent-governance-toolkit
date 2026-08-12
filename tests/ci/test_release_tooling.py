@@ -63,6 +63,10 @@ def test_esrp_pipeline_is_restored_as_temporary_registry_publish_path() -> None:
     assert "dryRun" in text
     assert ".github/release-tools/release-tools.txt" in text
     assert ".github/pipelines/release-tools" not in text
+    assert "job: Build_PyPI_Evidence_Dependency" in text
+    assert "stage: Publish_PyPI_Evidence" in text
+    assert "dependsOn: Publish_PyPI_Evidence" in text
+    assert "${{ if ne(pkg.name, 'agt-evidence') }}" in text
 
 
 def test_esrp_pipeline_builds_complete_acs_python_distribution() -> None:
@@ -81,7 +85,7 @@ def test_esrp_pipeline_builds_complete_acs_python_distribution() -> None:
         assert build_platform in text
 
     assert (
-        "condition: and(succeeded(), ne('${{ pkg.name }}', 'agent-control-specification'))"
+        "condition: and(succeeded(), ne('${{ pkg.name }}', 'agent-control-specification'), ne('${{ pkg.name }}', 'agt-evidence'))"
         in text
     )
     assert "python scripts/ci/smoke_acs_python_wheel.py" in text
@@ -119,12 +123,12 @@ def test_publish_workflow_publishes_language_artifacts() -> None:
     assert "release-manifest" in text
     assert "pypa/gh-action-pypi-publish" in text
     assert "Prepare PyPI upload artifacts" in text
-    assert "shopt -s nullglob" in text
-    assert "artifacts=(dist/*.whl dist/*.tar.gz)" in text
-    assert 'if [ "${#artifacts[@]}" -eq 0 ]; then' in text
-    assert 'cp "${artifacts[@]}" pypi-upload/' in text
-    assert "packages-dir: ${{ matrix.path }}/pypi-upload/" in text
-    assert "packages-dir: ${{ matrix.path }}/dist/" not in text
+    assert "cp dist/*.whl dist/*.tar.gz pypi-upload/" in text
+    assert "publish-agt-evidence:" in text
+    assert "publish-python:" in text
+    assert "name: pypi-agt-evidence" in text
+    assert "packages-dir: pypi-upload/" in text
+    assert "packages-dir: dist/" not in text
     assert 'registry-url: "https://registry.npmjs.org"' in text
     assert "NPM_TOKEN not set, skipping npm publish" in text
     assert 'npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version' in text
@@ -137,17 +141,27 @@ def test_publish_workflow_publishes_language_artifacts() -> None:
 def test_pypi_prepare_and_publish_conditions_match() -> None:
     text = PUBLISH.read_text(encoding="utf-8")
     condition = "if: github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'false'"
-    python_jobs = [
-        text[text.index("publish-acs-python:") : text.index("build-python:")],
-        text[text.index("build-python:") : text.index("resolve-npm-matrix:")],
+    acs_job = text[text.index("publish-acs-python:") : text.index("build-python:")]
+    prepare = acs_job[acs_job.index("- name: Prepare PyPI upload artifacts") :]
+    prepare = prepare[: prepare.index("- name: Upload build artifacts")]
+    publish = acs_job[acs_job.index("- name: Publish to PyPI") :]
+    publish = publish[: publish.index("uses: pypa/gh-action-pypi-publish")]
+    assert condition in prepare
+    assert condition in publish
+
+    evidence_job = text[
+        text.index("publish-agt-evidence:") : text.index("publish-python:")
     ]
-    for job in python_jobs:
-        prepare = job[job.index("- name: Prepare PyPI upload artifacts") :]
-        prepare = prepare[: prepare.index("- name: Upload build artifacts")]
-        publish = job[job.index("- name: Publish to PyPI") :]
-        publish = publish[: publish.index("uses: pypa/gh-action-pypi-publish")]
-        assert condition in prepare
-        assert condition in publish
+    dependent_job = text[
+        text.index("publish-python:") : text.index("resolve-npm-matrix:")
+    ]
+    assert "needs: [resolve-python-matrix, build-python]" in evidence_job
+    assert "needs.resolve-python-matrix.outputs.evidence == 'true'" in evidence_job
+    assert (
+        "needs: [resolve-python-matrix, build-python, publish-agt-evidence]"
+        in dependent_job
+    )
+    assert "needs.publish-agt-evidence.result == 'success'" in dependent_job
     assert (
         "github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'false'"
         in text
@@ -169,6 +183,8 @@ def test_acs_python_release_builds_complete_platform_matrix() -> None:
     assert 'wheel: "*macosx_11_0_arm64.whl"' in text
 
     assert "build_any: ${{ steps.resolve.outputs.build_any }}" in text
+    assert "publish_any: ${{ steps.resolve.outputs.publish_any }}" in text
+    assert "evidence: ${{ steps.resolve.outputs.evidence }}" in text
     assert "acs: ${{ steps.resolve.outputs.acs }}" in text
     assert 'select(.name != "agent-control-specification")' in text
     assert "if: needs.resolve-python-matrix.outputs.build_any == 'true'" in text
@@ -225,6 +241,7 @@ def test_release_manifest_generator_covers_artifact_families(tmp_path: Path) -> 
     ecosystems = {artifact["ecosystem"] for artifact in manifest["artifacts"]}
     assert {"pypi", "npm", "nuget", "crates.io", "go", "oci"} <= ecosystems
     names = {artifact["name"] for artifact in manifest["artifacts"]}
+    assert "agt-evidence" in names
     assert "agent-governance-toolkit-core" in names
     assert "agent-control-specification-native-packages" in names
     assert "AgentControlSpecification" in names

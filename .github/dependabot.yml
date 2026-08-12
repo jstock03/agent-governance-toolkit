@@ -19,6 +19,7 @@ updates:
   # dependency still gets its own individual PR per directory.
   - package-ecosystem: "pip"
     directories:
+      - "/agent-governance-python/agt-evidence"
       - "/agent-governance-python/agent-os"
       - "/agent-governance-python/agent-mesh"
       - "/agent-governance-python/agent-hypervisor"

@@ -1,6 +1,6 @@
 ---
 title: "Tutorial 18 — Compliance Verification & Attestation"
-last_reviewed: 2026-05-25
+last_reviewed: 2026-08-12
 owner: agt-maintainers
 ---
 
@@ -121,7 +121,7 @@ The verifier checks 10 controls from the OWASP Agentic Security Initiatives (ASI
 | ASI-03 | Excessive Agency | `agent_os.integrations.base` | `AgentControl` |
 | ASI-04 | Unauthorized Escalation | `agent_os.integrations.escalation` | `EscalationPolicy` |
 | ASI-05 | Trust Boundary Violation | `agentmesh.trust.cards` | `CardRegistry` |
-| ASI-06 | Insufficient Logging | `agentmesh.governance.audit` | `AuditChain` |
+| ASI-06 | Insufficient Logging | `agt_evidence.audit` | `AuditChain` |
 | ASI-07 | Insecure Identity | `agentmesh.identity.agent_id` | `AgentIdentity` |
 | ASI-08 | Policy Bypass | `agentmesh.governance.conflict_resolution` | `PolicyConflictResolver` |
 | ASI-09 | Supply Chain Integrity | `agent_compliance.integrity` | `IntegrityVerifier` |
@@ -613,7 +613,7 @@ Governance is only as strong as the code enforcing it. If someone modifies `Poli
 
 ### 8.2 Governance Modules Verified
 
-The verifier checks 15 core governance modules:
+The verifier checks 19 core governance modules:
 
 ```python
 GOVERNANCE_MODULES = [
@@ -623,7 +623,6 @@ GOVERNANCE_MODULES = [
     "agent_os.integrations.compat",
     "agentmesh.governance.policy",
     "agentmesh.governance.conflict_resolution",
-    "agentmesh.governance.audit",
     "agentmesh.governance.opa",
     "agentmesh.governance.compliance",
     "agentmesh.governance.shadow",
@@ -632,6 +631,11 @@ GOVERNANCE_MODULES = [
     "agentmesh.identity.rotation",
     "agentmesh.trust.cards",
     "agentmesh.storage.file_trust_store",
+    "agt_evidence",
+    "agt_evidence.audit",
+    "agt_evidence.backends",
+    "agentmesh.governance.audit",
+    "agentmesh.governance.audit_backends",
 ]
 ```
 
@@ -643,8 +647,14 @@ Beyond file-level hashing, the verifier also hashes the bytecode of critical fun
 CRITICAL_FUNCTIONS = [
     ("agentmesh.governance.policy", "PolicyEngine.evaluate"),
     ("agentmesh.governance.conflict_resolution", "PolicyConflictResolver.resolve"),
-    ("agentmesh.governance.audit", "AuditChain.add_entry"),
     ("agentmesh.trust.cards", "CardRegistry.is_verified"),
+    ("agt_evidence.audit", "AuditChain.add_entry"),
+    ("agt_evidence.audit", "AuditEntry.compute_hash"),
+    ("agt_evidence.backends", "SignedAuditEntry.verify"),
+    ("agt_evidence.backends", "HashChainVerifier.verify_file"),
+    ("agt_evidence", "AuditLog.log"),
+    ("agentmesh.governance.audit", "AuditLog.log"),
+    ("agentmesh.governance.audit_backends", "HashChainVerifier.verify_file"),
 ]
 ```
 

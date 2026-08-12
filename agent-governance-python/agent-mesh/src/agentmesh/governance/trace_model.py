@@ -9,7 +9,7 @@ import json
 from dataclasses import dataclass
 from typing import Optional
 
-from .audit import AuditEntry
+from agt_evidence import AuditEntry
 
 #: TRACE EAT profile URI emitted by AGT. Single source of truth: trace_sink.py
 #: imports this rather than repeating the literal, because a wire-format constant

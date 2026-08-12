@@ -46,7 +46,7 @@ from pathlib import Path
 from typing import Any
 
 from .annex_iv import AnnexIVDocument, TechnicalDocumentationExporter
-from .audit import AuditEntry
+from agt_evidence import AuditEntry
 from .compliance import ComplianceFramework, ComplianceReport
 from .policy import Policy
 

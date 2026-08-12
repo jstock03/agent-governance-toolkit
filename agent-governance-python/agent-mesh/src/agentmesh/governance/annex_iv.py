@@ -19,7 +19,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from .audit import AuditEntry
+from agt_evidence import AuditEntry
 from .compliance import ComplianceFramework, ComplianceReport
 from .policy import Policy
 

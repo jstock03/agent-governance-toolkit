@@ -71,6 +71,7 @@ COPY . /workspace
 # without reaching out to PyPI for the unpublished names.
 RUN --mount=type=cache,target=/root/.cache/pip \
     python -m pip install --no-deps \
+        -e "agent-governance-python/agt-evidence" \
         -e "agent-governance-python/agent-governance-toolkit-core" \
         -e "agent-governance-python/agent-governance-toolkit-integrations" \
         -e "agent-governance-python/agent-governance-toolkit-cli" \

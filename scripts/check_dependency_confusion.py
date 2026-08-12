@@ -37,6 +37,9 @@ REGISTERED_PACKAGES = {
     "agent-governance-toolkit-integrations", "agent_governance_toolkit_integrations",
     "agent-governance-toolkit-cli", "agent_governance_toolkit_cli",
     "agent-governance-toolkit-protocols", "agent_governance_toolkit_protocols",
+    # First-party package introduced in this draft. Merge remains gated on
+    # reserving the normalized project name on PyPI.
+    "agt-evidence", "agt_evidence",
     # Core packages (on PyPI) — both hyphen and underscore variants
     "agent-os-kernel", "agent_os_kernel",
     "agentmesh-platform", "agentmesh_platform",
@@ -256,10 +259,18 @@ REGISTERED_CARGO_PACKAGES = {
 # Patterns that are always safe (not package names)
 SAFE_PATTERNS = {
     "-e", "--editable", "-r", "--requirement", "--upgrade", "--no-cache-dir",
-    "--quiet", "--require-hashes", "--hash", ".", "..", "../..",
+    "--quiet", "--require-hashes", "--hash", "--find-links", ".", "..", "../..",
     "pip", "install", "%pip",
     # Dockerfile / shell tokens that appear alongside pip install
     "RUN", "run", "if", "then", "fi", "&&", "||", ";",
+}
+
+# These files contain scanner examples and test fixtures with intentionally
+# unregistered names. Scanning them as source text makes the scanner flag its
+# own documentation instead of real install commands.
+SCAN_EXCLUDED_FILES = {
+    "scripts/check_dependency_confusion.py",
+    "tests/ci/test_check_dependency_confusion.py",
 }
 
 PIP_INSTALL_RE = re.compile(
@@ -280,7 +291,15 @@ def extract_package_names(install_args: str) -> list[str]:
         # Skip flags
         if token.startswith("-") or token in SAFE_PATTERNS:
             # -e/--editable and -r/--requirement take a path as the next argument.
-            if token in ("-e", "--editable", "-r", "--requirement", "-c", "--constraint"):
+            if token in (
+                "-e",
+                "--editable",
+                "-r",
+                "--requirement",
+                "-c",
+                "--constraint",
+                "--find-links",
+            ):
                 skip_next = True
             continue
         if token.startswith((".", "/", "\\", "http", "git+")) or "/" in token or "\\" in token:
@@ -622,6 +641,11 @@ def main() -> int:
 
     all_findings = []
     for f in files:
+        normalized = f.replace("\\", "/")
+        while normalized.startswith("./"):
+            normalized = normalized[2:]
+        if normalized in SCAN_EXCLUDED_FILES:
+            continue
         all_findings.extend(check_file(f))
 
     # --strict: additionally scan all notebooks, requirements, and manifest files
