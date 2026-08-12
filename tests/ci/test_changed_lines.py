@@ -67,15 +67,15 @@ index 1111111..2222222 100644
 +++ b/src/counter.cpp
 @@ -1,2 +1,4 @@
  int main() {
-+++counter_with_a_typoo;
++++counter_increment;
 +  normal_added_line();
 """
 
-    # The added source line is `++counter_with_a_typoo;`, so the diff renders it
-    # as `+++counter_with_a_typoo;` -- indistinguishable from a file header by
+    # The added source line is `++counter_increment;`, so the diff renders it
+    # as `+++counter_increment;` -- indistinguishable from a file header by
     # prefix alone.
     assert changed_lines.extract_added_lines(diff_text) == (
-        "++counter_with_a_typoo;\n  normal_added_line();\n"
+        "++counter_increment;\n  normal_added_line();\n"
     )
 
 
@@ -85,15 +85,15 @@ def test_file_headers_are_still_skipped_across_several_files() -> None:
 --- a/a.md
 +++ b/a.md
 @@ -1 +1,2 @@
-+first tokenn
++first heading
 diff --git a/b.md b/b.md
 --- a/b.md
 +++ b/b.md
 @@ -1 +1,2 @@
-+second tokenn
++second heading
 """
 
-    assert changed_lines.extract_added_lines(diff_text) == "first tokenn\nsecond tokenn\n"
+    assert changed_lines.extract_added_lines(diff_text) == "first heading\nsecond heading\n"
 
 
 def test_fallback_emits_a_workflow_annotation_only_under_github_actions(
