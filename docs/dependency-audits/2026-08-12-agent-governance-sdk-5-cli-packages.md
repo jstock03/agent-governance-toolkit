@@ -64,11 +64,21 @@ service reachable only through parsing attacker-influenced YAML. The direction
 of travel is right, from two HIGH to one, and it should not be read as the
 bump making these packages advisory-free.
 
-**Recommended follow-up, out of scope for these three PRs:** repin the SDK's own
-`js-yaml` to `>= 5.2.2`. Fixing it in the SDK fixes it once for every consumer,
-whereas overriding it in three CLI lockfiles fixes it three times and drifts.
-Filed as a separate issue rather than held against a Dependabot PR that cannot
-act on it.
+**The source fix already landed, the published artifact has not.**
+`agent-governance-typescript/package.json` on `main` now pins `js-yaml`
+`5.2.3`, via #3623 on 2026-08-12. So the SDK source is clear of all four
+advisories above.
+
+What these three packages resolve is the *published* `@microsoft/agent-governance-sdk`
+`5.0.0`, released to npm on 2026-08-03, whose manifest pins `js-yaml` `5.2.1`.
+That artifact is immutable, so nothing in these lockfiles can reach `5.2.3`
+until a new SDK version is published.
+
+No follow-up PR is needed, and overriding `js-yaml` in three CLI lockfiles
+would be the wrong fix: it would pin around the SDK in three places and drift
+the moment the next SDK release lands. The residual exposure closes on the next
+publish. Recording it here so the gap between "fixed on main" and "fixed in what
+consumers install" is visible rather than assumed.
 
 ## Breaking Change Risk Assessment
 
