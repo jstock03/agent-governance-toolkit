@@ -102,27 +102,58 @@ class HostSession:
                 "intervention_point": "pre_tool_call",
             },
         }
-        coroutine = self.control.evaluate_intervention_point(
-            InterventionPoint.PRE_TOOL_CALL, snapshot, self.mode
+        result = _run_sync(
+            self.control.evaluate_intervention_point(
+                InterventionPoint.PRE_TOOL_CALL, snapshot, self.mode
+            )
         )
-        try:
-            asyncio.get_running_loop()
-        except RuntimeError:
-            return asyncio.run(coroutine)
-        outcome: dict[str, Any] = {}
-
-        def run() -> None:
+        if (
+            self.mode is EnforcementMode.ENFORCE
+            and result.verdict.decision is Decision.ESCALATE
+        ):
             try:
-                outcome["value"] = asyncio.run(coroutine)
-            except BaseException as exc:
-                outcome["error"] = exc
+                _run_sync(
+                    self.control.enforce(
+                        InterventionPoint.PRE_TOOL_CALL, result, self.mode
+                    )
+                )
+            except Exception:
+                return InterventionPointResult(
+                    verdict=Verdict(
+                        decision=Decision.DENY,
+                        reason=result.verdict.reason,
+                        message=result.verdict.message,
+                    )
+                )
+            return InterventionPointResult(
+                verdict=Verdict(
+                    decision=Decision.ALLOW,
+                    reason=result.verdict.reason,
+                    message=result.verdict.message,
+                )
+            )
+        return result
 
-        thread = threading.Thread(target=run)
-        thread.start()
-        thread.join()
-        if "error" in outcome:
-            raise outcome["error"]
-        return outcome["value"]
+
+def _run_sync(coroutine: Any) -> Any:
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coroutine)
+    outcome: dict[str, Any] = {}
+
+    def run() -> None:
+        try:
+            outcome["value"] = asyncio.run(coroutine)
+        except BaseException as exc:
+            outcome["error"] = exc
+
+    thread = threading.Thread(target=run)
+    thread.start()
+    thread.join()
+    if "error" in outcome:
+        raise outcome["error"]
+    return outcome["value"]
 
 
 module = types.ModuleType("agent_control_specification")

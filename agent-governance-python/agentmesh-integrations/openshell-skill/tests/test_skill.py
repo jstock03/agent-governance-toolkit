@@ -76,7 +76,7 @@ class FakeControl:
         return self.outcomes.pop(0) if len(self.outcomes) > 1 else self.outcomes[0]
 
     async def enforce(self, point: Any, outcome: Any, mode: Any) -> None:
-        return None
+        raise RuntimeError("approval unavailable")
 
 
 class BrokenControl:
@@ -156,12 +156,17 @@ def test_builds_canonical_pre_tool_call_snapshot(
     assert snapshot["envelope"]["session"]["id"] == "sandbox-42"
 
 
-@pytest.mark.parametrize("decision", [Decision.DENY, Decision.ESCALATE])
-def test_non_permitting_verdicts_raise(decision: Decision) -> None:
+@pytest.mark.parametrize(
+    ("decision", "effective_decision"),
+    [(Decision.DENY, Decision.DENY), (Decision.ESCALATE, Decision.DENY)],
+)
+def test_non_permitting_verdicts_raise(
+    decision: Decision, effective_decision: Decision
+) -> None:
     skill = GovernanceSkill(FakeControl([result(decision, reason="blocked")]))
     with pytest.raises(ShellPolicyViolation, match="blocked") as caught:
         skill.authorize_shell_command(["danger"], api="test")
-    assert caught.value.result.verdict.decision is decision
+    assert caught.value.result.verdict.decision is effective_decision
 
 
 @pytest.mark.parametrize("decision", [Decision.ALLOW, Decision.WARN])
