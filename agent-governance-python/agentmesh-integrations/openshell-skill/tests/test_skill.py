@@ -11,8 +11,10 @@ import threading
 from pathlib import Path
 from typing import Any
 
+import agent_control_specification as acs
 import pytest
 from agent_control_specification import (
+    AgentControl,
     Decision,
     InterventionPointResult,
     Transform,
@@ -21,6 +23,27 @@ from agent_control_specification import (
 
 from openshell_agentmesh import GovernanceSkill, ShellPolicyViolation, governed_shell
 from openshell_agentmesh.cli import main as cli_main
+
+
+_NATIVE_MANIFEST = """agent_control_specification_version: 0.3.0-alpha-agt
+metadata:
+  name: openshell_adapter_scenarios
+extends: []
+policies:
+  shell_policy:
+    type: custom
+    adapter: openshell_adapter_scenarios
+intervention_points:
+  pre_tool_call:
+    policy_target: $.tool_call.args
+    policy_target_kind: tool_args
+    tool_name_from: $.tool_call.name
+    policy:
+      id: shell_policy
+tools:
+  shell.execute:
+    clearance: restricted
+"""
 
 
 def result(
@@ -61,6 +84,38 @@ class BrokenControl:
         self, point: Any, snapshot: dict[str, Any], mode: Any
     ):
         raise RuntimeError("backend unavailable")
+
+
+class ScriptedNativePolicy:
+    def __init__(self, verdict: dict[str, Any]) -> None:
+        self.verdict = verdict
+        self.invocations: list[dict[str, Any]] = []
+
+    def evaluate(self, invocation: Any) -> dict[str, Any]:
+        self.invocations.append(dict(invocation))
+        return self.verdict
+
+
+@pytest.mark.skipif(
+    getattr(acs, "_IS_OPEN_SHELL_TEST_STUB", False),
+    reason="native ACS extension is unavailable",
+)
+def test_native_acs_manifest_allows_and_denies_shell_actions() -> None:
+    allow_policy = ScriptedNativePolicy({"decision": "allow"})
+    allow_skill = GovernanceSkill(
+        AgentControl.from_native(_NATIVE_MANIFEST, policy_dispatcher=allow_policy)
+    )
+    command, outcome = allow_skill.authorize_shell_command(["git", "status"], api="test")
+    assert command == ["git", "status"]
+    assert outcome.verdict.decision is Decision.ALLOW
+    assert allow_policy.invocations[0]["input"]["tool"]["name"] == "shell.execute"
+
+    deny_policy = ScriptedNativePolicy({"decision": "deny", "reason": "blocked-native"})
+    deny_skill = GovernanceSkill(
+        AgentControl.from_native(_NATIVE_MANIFEST, policy_dispatcher=deny_policy)
+    )
+    with pytest.raises(ShellPolicyViolation, match="blocked-native"):
+        deny_skill.authorize_shell_command(["danger"], api="test")
 
 
 def test_builds_canonical_pre_tool_call_snapshot(

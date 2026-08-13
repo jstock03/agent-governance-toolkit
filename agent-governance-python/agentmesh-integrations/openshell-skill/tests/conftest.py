@@ -1,21 +1,32 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
-"""A minimal ACS contract stub for adapter unit tests.
+"""A minimal ACS contract stub for local adapter unit tests.
 
-The published ACS package includes a native extension. Adapter unit tests do
-not need that extension, so this stub keeps the suite runnable in lightweight
-Python jobs. Native ACS behavior is covered by the policy-engine SDK suite.
+CI uses the real native ACS extension. Developers who cannot build that
+extension locally may explicitly opt into this contract stub by setting
+``OPENSHELL_TEST_STUB_ACS=1``; the native integration test is then skipped.
 """
 
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
 import threading
 import types
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
+
+
+try:
+    import agent_control_specification as _real_acs  # noqa: F401
+
+    _USE_STUB = False
+except ImportError:
+    if os.getenv("OPENSHELL_TEST_STUB_ACS") != "1":
+        raise
+    _USE_STUB = True
 
 
 class Decision(str, Enum):
@@ -115,6 +126,7 @@ class HostSession:
 
 
 module = types.ModuleType("agent_control_specification")
+module._IS_OPEN_SHELL_TEST_STUB = True  # type: ignore[attr-defined]
 for name, value in {
     "AgentControl": AgentControl,
     "Decision": Decision,
@@ -125,4 +137,5 @@ for name, value in {
     "Verdict": Verdict,
 }.items():
     setattr(module, name, value)
-sys.modules.setdefault("agent_control_specification", module)
+if _USE_STUB:
+    sys.modules["agent_control_specification"] = module
