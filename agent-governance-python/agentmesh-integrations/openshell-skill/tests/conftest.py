@@ -10,6 +10,7 @@ extension locally may explicitly opt into this contract stub by setting
 from __future__ import annotations
 
 import asyncio
+import importlib
 import os
 import sys
 import threading
@@ -20,7 +21,7 @@ from typing import Any
 
 
 try:
-    import agent_control_specification as _real_acs  # noqa: F401
+    importlib.import_module("agent_control_specification")
 
     _USE_STUB = False
 except ImportError:
@@ -145,7 +146,7 @@ def _run_sync(coroutine: Any) -> Any:
     def run() -> None:
         try:
             outcome["value"] = asyncio.run(coroutine)
-        except BaseException as exc:
+        except Exception as exc:
             outcome["error"] = exc
 
     thread = threading.Thread(target=run)

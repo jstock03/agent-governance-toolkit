@@ -13,13 +13,6 @@ from typing import Any
 
 import agent_control_specification as acs
 import pytest
-from agent_control_specification import (
-    AgentControl,
-    Decision,
-    InterventionPointResult,
-    Transform,
-    Verdict,
-)
 
 from openshell_agentmesh import GovernanceSkill, ShellPolicyViolation, governed_shell
 from openshell_agentmesh.cli import main as cli_main
@@ -47,26 +40,28 @@ tools:
 
 
 def result(
-    decision: Decision,
+    decision: acs.Decision,
     *,
     reason: str = "test",
     transformed: Any = None,
-) -> InterventionPointResult:
+) -> acs.InterventionPointResult:
     transform = (
-        Transform(path="$", value=transformed)
-        if decision is Decision.TRANSFORM
+        acs.Transform(path="$", value=transformed)
+        if decision is acs.Decision.TRANSFORM
         else None
     )
-    return InterventionPointResult(
-        verdict=Verdict(decision=decision, reason=reason, transform=transform),
+    return acs.InterventionPointResult(
+        verdict=acs.Verdict(decision=decision, reason=reason, transform=transform),
         transformed_policy_target=transformed,
-        transformed_policy_target_applied=decision is Decision.TRANSFORM,
+        transformed_policy_target_applied=decision is acs.Decision.TRANSFORM,
     )
 
 
 class FakeControl:
-    def __init__(self, outcomes: list[InterventionPointResult] | None = None) -> None:
-        self.outcomes = list(outcomes or [result(Decision.ALLOW)])
+    def __init__(
+        self, outcomes: list[acs.InterventionPointResult] | None = None
+    ) -> None:
+        self.outcomes = list(outcomes or [result(acs.Decision.ALLOW)])
         self.requests: list[tuple[Any, dict[str, Any], Any]] = []
 
     async def evaluate_intervention_point(
@@ -103,16 +98,16 @@ class ScriptedNativePolicy:
 def test_native_acs_manifest_allows_and_denies_shell_actions() -> None:
     allow_policy = ScriptedNativePolicy({"decision": "allow"})
     allow_skill = GovernanceSkill(
-        AgentControl.from_native(_NATIVE_MANIFEST, policy_dispatcher=allow_policy)
+        acs.AgentControl.from_native(_NATIVE_MANIFEST, policy_dispatcher=allow_policy)
     )
     command, outcome = allow_skill.authorize_shell_command(["git", "status"], api="test")
     assert command == ["git", "status"]
-    assert outcome.verdict.decision is Decision.ALLOW
+    assert outcome.verdict.decision is acs.Decision.ALLOW
     assert allow_policy.invocations[0]["input"]["tool"]["name"] == "shell.execute"
 
     deny_policy = ScriptedNativePolicy({"decision": "deny", "reason": "blocked-native"})
     deny_skill = GovernanceSkill(
-        AgentControl.from_native(_NATIVE_MANIFEST, policy_dispatcher=deny_policy)
+        acs.AgentControl.from_native(_NATIVE_MANIFEST, policy_dispatcher=deny_policy)
     )
     with pytest.raises(ShellPolicyViolation, match="blocked-native"):
         deny_skill.authorize_shell_command(["danger"], api="test")
@@ -136,7 +131,7 @@ def test_builds_canonical_pre_tool_call_snapshot(
     )
 
     assert command == ["git", "status"]
-    assert outcome.verdict.decision is Decision.ALLOW
+    assert outcome.verdict.decision is acs.Decision.ALLOW
     point, snapshot, _ = control.requests[0]
     assert point.value == "pre_tool_call"
     assert snapshot["tool_call"]["name"] == "shell.execute"
@@ -158,10 +153,13 @@ def test_builds_canonical_pre_tool_call_snapshot(
 
 @pytest.mark.parametrize(
     ("decision", "effective_decision"),
-    [(Decision.DENY, Decision.DENY), (Decision.ESCALATE, Decision.DENY)],
+    [
+        (acs.Decision.DENY, acs.Decision.DENY),
+        (acs.Decision.ESCALATE, acs.Decision.DENY),
+    ],
 )
 def test_non_permitting_verdicts_raise(
-    decision: Decision, effective_decision: Decision
+    decision: acs.Decision, effective_decision: acs.Decision
 ) -> None:
     skill = GovernanceSkill(FakeControl([result(decision, reason="blocked")]))
     with pytest.raises(ShellPolicyViolation, match="blocked") as caught:
@@ -169,8 +167,8 @@ def test_non_permitting_verdicts_raise(
     assert caught.value.result.verdict.decision is effective_decision
 
 
-@pytest.mark.parametrize("decision", [Decision.ALLOW, Decision.WARN])
-def test_permitting_verdicts_preserve_command(decision: Decision) -> None:
+@pytest.mark.parametrize("decision", [acs.Decision.ALLOW, acs.Decision.WARN])
+def test_permitting_verdicts_preserve_command(decision: acs.Decision) -> None:
     original = ("python", "-V")
     command, _ = GovernanceSkill(
         FakeControl([result(decision)])
@@ -181,7 +179,7 @@ def test_permitting_verdicts_preserve_command(decision: Decision) -> None:
 def test_transform_replaces_argv_and_preserves_sequence_type() -> None:
     target = {"argv": ["python", "-V"], "command": "python -V"}
     skill = GovernanceSkill(
-        FakeControl([result(Decision.TRANSFORM, transformed=target)])
+        FakeControl([result(acs.Decision.TRANSFORM, transformed=target)])
     )
     command, _ = skill.authorize_shell_command(("unsafe",), api="test")
     assert command == ("python", "-V")
@@ -190,7 +188,7 @@ def test_transform_replaces_argv_and_preserves_sequence_type() -> None:
 def test_shell_transform_requires_command_string() -> None:
     target = {"argv": ["echo", "safe"]}
     skill = GovernanceSkill(
-        FakeControl([result(Decision.TRANSFORM, transformed=target)])
+        FakeControl([result(acs.Decision.TRANSFORM, transformed=target)])
     )
     with pytest.raises(PermissionError, match="string command"):
         skill.authorize_shell_command("unsafe", api="test", shell=True)
@@ -199,7 +197,7 @@ def test_shell_transform_requires_command_string() -> None:
 @pytest.mark.parametrize("target", [None, [], {}, {"argv": []}, {"argv": [1]}])
 def test_invalid_transform_fails_closed(target: Any) -> None:
     skill = GovernanceSkill(
-        FakeControl([result(Decision.TRANSFORM, transformed=target)])
+        FakeControl([result(acs.Decision.TRANSFORM, transformed=target)])
     )
     with pytest.raises(
         PermissionError, match="invalid command transform|non-empty string argv"
@@ -231,7 +229,7 @@ def test_governed_subprocess_executes_allowed_command() -> None:
 
 def test_governed_subprocess_does_not_execute_denied_command(tmp_path: Path) -> None:
     marker = tmp_path / "must-not-exist"
-    skill = GovernanceSkill(FakeControl([result(Decision.DENY)]))
+    skill = GovernanceSkill(FakeControl([result(acs.Decision.DENY)]))
     with governed_shell(skill):
         with pytest.raises(ShellPolicyViolation):
             subprocess.run(
@@ -246,7 +244,7 @@ def test_transform_is_applied_before_subprocess_execution() -> None:
         "command": f"{sys.executable} -c \"print('safe')\"",
     }
     skill = GovernanceSkill(
-        FakeControl([result(Decision.TRANSFORM, transformed=target)])
+        FakeControl([result(acs.Decision.TRANSFORM, transformed=target)])
     )
     with governed_shell(skill):
         completed = subprocess.run(
@@ -264,7 +262,7 @@ def test_transform_of_string_command_executes_as_argv() -> None:
         "command": f"{sys.executable} -c \"print('safe-string')\"",
     }
     skill = GovernanceSkill(
-        FakeControl([result(Decision.TRANSFORM, transformed=target)])
+        FakeControl([result(acs.Decision.TRANSFORM, transformed=target)])
     )
     with governed_shell(skill):
         completed = subprocess.run("unsafe", capture_output=True, text=True, check=True)
@@ -304,9 +302,13 @@ def test_interception_is_restored_after_context() -> None:
 
 def test_interception_is_restored_when_body_raises() -> None:
     original_run = subprocess.run
-    with pytest.raises(RuntimeError, match="body failed"):
+    try:
         with governed_shell(GovernanceSkill(FakeControl())):
             raise RuntimeError("body failed")
+    except RuntimeError as exc:
+        assert str(exc) == "body failed"
+    else:
+        pytest.fail("governed body did not raise")
     assert subprocess.run is original_run
 
 
@@ -403,7 +405,7 @@ def test_cli_reports_allow(
 def test_cli_reports_deny(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    skill = GovernanceSkill(FakeControl([result(Decision.DENY, reason="no")]))
+    skill = GovernanceSkill(FakeControl([result(acs.Decision.DENY, reason="no")]))
     monkeypatch.setattr(
         GovernanceSkill, "from_manifest", classmethod(lambda cls, path, **kw: skill)
     )
