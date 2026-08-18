@@ -55,6 +55,7 @@ from agentmesh.integrations.django_middleware import (  # noqa: E402
     trust_exempt,
     trust_required,
 )
+from agentmesh.integrations.django_middleware import middleware as middleware_module  # noqa: E402
 
 # ── Dummy views & URL configuration ─────────────────────────────────
 
@@ -298,6 +299,33 @@ class TestAgentTrustMiddleware:
 
             assert mw(original).status_code == 200
             assert mw(replay).status_code == 403
+        finally:
+            del settings.AGENTMESH_AGENT_KEYS
+
+    def test_future_timestamp_nonce_is_cached_until_signature_expires(self, monkeypatch):
+        from cryptography.hazmat.primitives.asymmetric import ed25519
+
+        now = datetime(2026, 8, 18, 12, 0, tzinfo=UTC)
+        private_key = ed25519.Ed25519PrivateKey.generate()
+        agent_did = "did:mesh:future-replay"
+        timestamp = (now + timedelta(seconds=299)).isoformat()
+        settings.AGENTMESH_AGENT_KEYS = {agent_did: private_key.public_key()}
+        try:
+            mw = _make_middleware()
+            original_add = mw._replay_cache.add
+            observed_timeout = None
+
+            def _recording_add(key, value, timeout=None, version=None):
+                nonlocal observed_timeout
+                observed_timeout = timeout
+                return original_add(key, value, timeout=timeout, version=version)
+
+            monkeypatch.setattr(middleware_module, "_utcnow", lambda: now)
+            monkeypatch.setattr(mw._replay_cache, "add", _recording_add)
+
+            request = _signed_request(private_key, agent_did, timestamp=timestamp)
+            assert mw(request).status_code == 200
+            assert observed_timeout == 599
         finally:
             del settings.AGENTMESH_AGENT_KEYS
 

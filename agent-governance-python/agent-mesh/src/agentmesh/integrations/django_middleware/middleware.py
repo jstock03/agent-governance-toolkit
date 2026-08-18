@@ -14,6 +14,7 @@ import base64
 import binascii
 import hashlib
 import logging
+import math
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
@@ -37,6 +38,10 @@ _TRUST_REQUIRED_ATTR = "_agentmesh_min_trust_score"
 def _get_setting(name: str, default: Any) -> Any:
     """Read a Django setting with a fallback default."""
     return getattr(settings, name, default)
+
+
+def _utcnow() -> datetime:
+    return datetime.now(UTC)
 
 
 class AgentTrustMiddleware:
@@ -272,9 +277,17 @@ class AgentTrustMiddleware:
             return 0
         if timestamp.tzinfo is None:
             return 0
-        age_seconds = abs((datetime.now(UTC) - timestamp).total_seconds())
+        now = _utcnow()
+        age_seconds = abs((now - timestamp).total_seconds())
         if age_seconds > replay_window:
             return 0
+
+        # Retain the nonce until the signed timestamp's complete validity
+        # interval ends, including any accepted future clock skew.
+        replay_timeout = max(
+            1,
+            math.ceil((timestamp - now).total_seconds() + replay_window),
+        )
 
         if len(agent_nonce) > 128:
             return 0
@@ -318,7 +331,7 @@ class AgentTrustMiddleware:
         replay_key_material = agent_did.encode("utf-8") + b"\0" + nonce_bytes
         replay_key = "agentmesh:request-nonce:" + hashlib.sha256(replay_key_material).hexdigest()
         try:
-            if not self._replay_cache.add(replay_key, True, timeout=replay_window):
+            if not self._replay_cache.add(replay_key, True, timeout=replay_timeout):
                 logger.warning("Replay detected for agent %s", agent_did)
                 return 0
         except Exception:
