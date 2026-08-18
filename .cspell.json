@@ -101,7 +101,10 @@
     "pwsh",
     "notlike",
     "sdists",
-    "shellcheck"
+    "shellcheck",
+    "binascii",
+    "locmem",
+    "altchars"
   ],
   "ignorePaths": [
     "**/node_modules/**",

@@ -361,7 +361,9 @@ class TestAgentTrustMiddleware:
         finally:
             del settings.AGENTMESH_AGENT_KEYS
 
-    @pytest.mark.parametrize("nonce", ["not base64!", "c2hvcnQ", "a" * 129])
+    @pytest.mark.parametrize(
+        "nonce", ["not base64!", base64.b64encode(b"short").decode(), "a" * 129]
+    )
     def test_malformed_or_undersized_nonce_is_rejected(self, nonce):
         from cryptography.hazmat.primitives.asymmetric import ed25519
 
