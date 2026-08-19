@@ -10,8 +10,8 @@ pip install "agent-governance-toolkit-core[django,redis]"
 
 ## Server Configuration
 
-Configure a cache shared by every Django worker and replica. The cache backend must implement
-atomic `add()` semantics so that only one request can claim a nonce.
+Configure Django's `RedisCache` or a shared memcached backend across every worker and replica.
+These backends provide atomic `add()` semantics so that only one request can claim a nonce.
 
 ```python
 CACHES = {
@@ -24,6 +24,7 @@ CACHES = {
 AGENTMESH_AUDIENCE = "billing-api"
 AGENTMESH_REPLAY_CACHE_ALIAS = "agentmesh_replay"
 AGENTMESH_REPLAY_WINDOW_SECONDS = 300
+AGENTMESH_MAX_SIGNED_BODY_BYTES = 2_621_440
 AGENTMESH_AGENT_KEYS = {
     "did:mesh:alice": alice_ed25519_public_key,
 }
@@ -34,9 +35,15 @@ MIDDLEWARE = [
 ]
 ```
 
-The middleware refuses to start with Django's local-memory cache because that backend cannot
-detect replay across processes. Tests and single-process development servers can explicitly set
+The middleware fails closed at startup for unsupported backends, including dummy, file-based,
+database, and custom caches whose shared atomic nonce claims cannot be guaranteed. It also refuses
+to start with Django's local-memory cache because that backend cannot detect replay across
+processes. Tests and single-process development servers can explicitly set
 `AGENTMESH_ALLOW_LOCAL_REPLAY_CACHE = True`; do not enable this setting in production.
+
+Signed request bodies are limited to `AGENTMESH_MAX_SIGNED_BODY_BYTES` (2.5 MiB by default). The
+middleware enforces the limit while reading the stream, including when `Content-Length` is absent
+or understated.
 
 ## Signing Requests
 

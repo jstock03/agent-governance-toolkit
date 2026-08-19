@@ -44,6 +44,8 @@ import django as _django  # noqa: E402
 _django.setup()
 
 from django.core.cache import caches  # noqa: E402
+from django.core.cache.backends.dummy import DummyCache  # noqa: E402
+from django.core.cache.backends.filebased import FileBasedCache  # noqa: E402
 from django.core.exceptions import ImproperlyConfigured  # noqa: E402
 from django.http import HttpResponse, JsonResponse  # noqa: E402
 from django.test import RequestFactory  # noqa: E402
@@ -302,6 +304,40 @@ class TestAgentTrustMiddleware:
         finally:
             del settings.AGENTMESH_AGENT_KEYS
 
+    def test_concurrent_replayed_requests_accept_only_one(self, monkeypatch):
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Barrier
+
+        from cryptography.hazmat.primitives.asymmetric import ed25519
+
+        private_key = ed25519.Ed25519PrivateKey.generate()
+        agent_did = "did:mesh:concurrent-replay"
+        settings.AGENTMESH_AGENT_KEYS = {agent_did: private_key.public_key()}
+        try:
+            mw = _make_middleware()
+            original = _signed_request(private_key, agent_did)
+            headers = {
+                key: value
+                for key, value in original.META.items()
+                if key.startswith("HTTP_X_AGENT_")
+            }
+            requests = [RequestFactory().get("/api/data/", **headers) for _ in range(2)]
+            barrier = Barrier(2)
+            original_add = mw._replay_cache.add
+
+            def _simultaneous_add(*args, **kwargs):
+                barrier.wait(timeout=5)
+                return original_add(*args, **kwargs)
+
+            monkeypatch.setattr(mw._replay_cache, "add", _simultaneous_add)
+
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                statuses = list(executor.map(lambda request: mw(request).status_code, requests))
+
+            assert sorted(statuses) == [200, 403]
+        finally:
+            del settings.AGENTMESH_AGENT_KEYS
+
     def test_future_timestamp_nonce_is_cached_until_signature_expires(self, monkeypatch):
         from cryptography.hazmat.primitives.asymmetric import ed25519
 
@@ -326,6 +362,115 @@ class TestAgentTrustMiddleware:
             request = _signed_request(private_key, agent_did, timestamp=timestamp)
             assert mw(request).status_code == 200
             assert observed_timeout == 599
+        finally:
+            del settings.AGENTMESH_AGENT_KEYS
+
+    def test_timestamp_expiring_while_body_is_read_is_rejected(self, monkeypatch):
+        from cryptography.hazmat.primitives.asymmetric import ed25519
+
+        signed_at = datetime(2026, 8, 18, 12, 0, tzinfo=UTC)
+        current_time = signed_at
+        private_key = ed25519.Ed25519PrivateKey.generate()
+        agent_did = "did:mesh:slow-replay"
+        settings.AGENTMESH_AGENT_KEYS = {agent_did: private_key.public_key()}
+        try:
+            request = _signed_request(
+                private_key,
+                agent_did,
+                method="POST",
+                body=b"delayed body",
+                timestamp=signed_at.isoformat(),
+            )
+            request_read = request.read
+
+            def _delayed_read(*args, **kwargs):
+                nonlocal current_time
+                current_time = signed_at + timedelta(seconds=301)
+                return request_read(*args, **kwargs)
+
+            monkeypatch.setattr(request, "read", _delayed_read)
+            monkeypatch.setattr(middleware_module, "_utcnow", lambda: current_time)
+
+            assert _make_middleware()(request).status_code == 403
+        finally:
+            del settings.AGENTMESH_AGENT_KEYS
+
+    def test_timestamp_expiring_while_nonce_is_claimed_is_rejected(self, monkeypatch):
+        from cryptography.hazmat.primitives.asymmetric import ed25519
+
+        signed_at = datetime(2026, 8, 18, 12, 0, tzinfo=UTC)
+        current_time = signed_at
+        private_key = ed25519.Ed25519PrivateKey.generate()
+        agent_did = "did:mesh:slow-cache"
+        settings.AGENTMESH_AGENT_KEYS = {agent_did: private_key.public_key()}
+        try:
+            mw = _make_middleware()
+            original_add = mw._replay_cache.add
+
+            def _delayed_add(*args, **kwargs):
+                nonlocal current_time
+                result = original_add(*args, **kwargs)
+                current_time = signed_at + timedelta(seconds=301)
+                return result
+
+            monkeypatch.setattr(middleware_module, "_utcnow", lambda: current_time)
+            monkeypatch.setattr(mw._replay_cache, "add", _delayed_add)
+            request = _signed_request(
+                private_key,
+                agent_did,
+                timestamp=signed_at.isoformat(),
+            )
+
+            assert mw(request).status_code == 403
+        finally:
+            del settings.AGENTMESH_AGENT_KEYS
+
+    @pytest.mark.parametrize("include_content_length", [True, False])
+    def test_oversized_signed_body_is_rejected(self, include_content_length):
+        from cryptography.hazmat.primitives.asymmetric import ed25519
+
+        private_key = ed25519.Ed25519PrivateKey.generate()
+        agent_did = "did:mesh:oversized-body"
+        settings.AGENTMESH_AGENT_KEYS = {agent_did: private_key.public_key()}
+        settings.AGENTMESH_MAX_SIGNED_BODY_BYTES = 4
+        try:
+            request = _signed_request(
+                private_key,
+                agent_did,
+                method="POST",
+                body=b"12345",
+            )
+            if not include_content_length:
+                request.META.pop("CONTENT_LENGTH", None)
+
+            assert _make_middleware()(request).status_code == 403
+        finally:
+            del settings.AGENTMESH_AGENT_KEYS
+            del settings.AGENTMESH_MAX_SIGNED_BODY_BYTES
+
+    def test_signed_body_remains_available_to_view(self):
+        from cryptography.hazmat.primitives.asymmetric import ed25519
+
+        private_key = ed25519.Ed25519PrivateKey.generate()
+        agent_did = "did:mesh:body-preserved"
+        body = b"signed body"
+        settings.AGENTMESH_AGENT_KEYS = {agent_did: private_key.public_key()}
+
+        def _body_view(request):
+            return HttpResponse(request.body)
+
+        try:
+            request = _signed_request(
+                private_key,
+                agent_did,
+                method="POST",
+                body=body,
+            )
+
+            response = _make_middleware(get_response=_body_view)(request)
+
+            assert response.status_code == 200
+            assert response.content == body
         finally:
             del settings.AGENTMESH_AGENT_KEYS
 
@@ -462,6 +607,30 @@ class TestAgentTrustMiddleware:
         finally:
             settings.AGENTMESH_ALLOW_LOCAL_REPLAY_CACHE = True
 
+    @pytest.mark.parametrize("opt_in", ["True", "False", 1])
+    def test_local_replay_cache_requires_literal_boolean_opt_in(self, opt_in):
+        settings.AGENTMESH_ALLOW_LOCAL_REPLAY_CACHE = opt_in
+        try:
+            with pytest.raises(ImproperlyConfigured, match="cannot prevent replay"):
+                _make_middleware()
+        finally:
+            settings.AGENTMESH_ALLOW_LOCAL_REPLAY_CACHE = True
+
+    @pytest.mark.parametrize("backend_type", [DummyCache, FileBasedCache])
+    def test_unsupported_replay_cache_backend_fails_at_startup(
+        self, backend_type, monkeypatch, tmp_path
+    ):
+        cache_alias = "unsupported-replay-cache"
+        location = str(tmp_path) if backend_type is FileBasedCache else "unused"
+        backend = backend_type(location, {})
+        monkeypatch.setattr(middleware_module, "caches", {cache_alias: backend})
+        settings.AGENTMESH_REPLAY_CACHE_ALIAS = cache_alias
+        try:
+            with pytest.raises(ImproperlyConfigured, match="RedisCache or a shared memcached"):
+                _make_middleware()
+        finally:
+            settings.AGENTMESH_REPLAY_CACHE_ALIAS = "default"
+
     def test_missing_audience_fails_at_startup(self):
         audience = settings.AGENTMESH_AUDIENCE
         settings.AGENTMESH_AUDIENCE = ""
@@ -478,6 +647,14 @@ class TestAgentTrustMiddleware:
                 _make_middleware()
         finally:
             del settings.AGENTMESH_REPLAY_WINDOW_SECONDS
+
+    def test_invalid_max_signed_body_size_fails_at_startup(self):
+        settings.AGENTMESH_MAX_SIGNED_BODY_BYTES = 0
+        try:
+            with pytest.raises(ImproperlyConfigured, match="MAX_SIGNED_BODY_BYTES"):
+                _make_middleware()
+        finally:
+            del settings.AGENTMESH_MAX_SIGNED_BODY_BYTES
 
 
 class TestTrustRequiredDecorator:

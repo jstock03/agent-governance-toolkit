@@ -17,11 +17,14 @@ import logging
 import math
 from collections.abc import Callable
 from datetime import UTC, datetime
+from io import BytesIO
 from typing import Any
 
 from django.conf import settings
 from django.core.cache import InvalidCacheBackendError, caches
 from django.core.cache.backends.locmem import LocMemCache
+from django.core.cache.backends.memcached import BaseMemcachedCache
+from django.core.cache.backends.redis import RedisCache
 from django.core.exceptions import ImproperlyConfigured
 from django.http import HttpRequest, HttpResponse, JsonResponse
 
@@ -64,6 +67,8 @@ class AgentTrustMiddleware:
             atomic replay detection
         - ``AGENTMESH_REPLAY_WINDOW_SECONDS`` — accepted timestamp window and
             replay-cache lifetime (default 300)
+        - ``AGENTMESH_MAX_SIGNED_BODY_BYTES`` — maximum request body size covered
+            by signature verification (default 2.5 MiB)
     - ``AGENTMESH_EXEMPT_PATHS`` — list of URL path prefixes that skip
       trust verification (default ``[]``)
 
@@ -77,6 +82,8 @@ class AgentTrustMiddleware:
             raise ImproperlyConfigured("AGENTMESH_AUDIENCE must identify this service")
         if self._replay_window_seconds() <= 0:
             raise ImproperlyConfigured("AGENTMESH_REPLAY_WINDOW_SECONDS must be positive")
+        if self._max_signed_body_bytes() <= 0:
+            raise ImproperlyConfigured("AGENTMESH_MAX_SIGNED_BODY_BYTES must be positive")
         cache_alias = str(_get_setting("AGENTMESH_REPLAY_CACHE_ALIAS", "")).strip()
         if not cache_alias:
             raise ImproperlyConfigured(
@@ -88,13 +95,17 @@ class AgentTrustMiddleware:
             raise ImproperlyConfigured(
                 f"AGENTMESH_REPLAY_CACHE_ALIAS references an invalid cache: {cache_alias}"
             ) from exc
-        if isinstance(self._replay_cache, LocMemCache) and not bool(
-            _get_setting("AGENTMESH_ALLOW_LOCAL_REPLAY_CACHE", False)
-        ):
+        if isinstance(self._replay_cache, LocMemCache):
+            if _get_setting("AGENTMESH_ALLOW_LOCAL_REPLAY_CACHE", False) is not True:
+                raise ImproperlyConfigured(
+                    "The local-memory cache cannot prevent replay across workers; configure a "
+                    "shared AGENTMESH_REPLAY_CACHE_ALIAS or explicitly set "
+                    "AGENTMESH_ALLOW_LOCAL_REPLAY_CACHE=True for development"
+                )
+        elif not isinstance(self._replay_cache, (RedisCache, BaseMemcachedCache)):
             raise ImproperlyConfigured(
-                "The local-memory cache cannot prevent replay across workers; configure a shared "
-                "AGENTMESH_REPLAY_CACHE_ALIAS or explicitly set "
-                "AGENTMESH_ALLOW_LOCAL_REPLAY_CACHE=True for development"
+                "AGENTMESH_REPLAY_CACHE_ALIAS must use Django's RedisCache or a shared memcached "
+                "backend with atomic add() semantics"
             )
 
     # ------------------------------------------------------------------
@@ -124,6 +135,10 @@ class AgentTrustMiddleware:
     @staticmethod
     def _replay_window_seconds() -> int:
         return int(_get_setting("AGENTMESH_REPLAY_WINDOW_SECONDS", 300))
+
+    @staticmethod
+    def _max_signed_body_bytes() -> int:
+        return int(_get_setting("AGENTMESH_MAX_SIGNED_BODY_BYTES", 2_621_440))
 
     @staticmethod
     def _exempt_paths() -> list[str]:
@@ -277,17 +292,8 @@ class AgentTrustMiddleware:
             return 0
         if timestamp.tzinfo is None:
             return 0
-        now = _utcnow()
-        age_seconds = abs((now - timestamp).total_seconds())
-        if age_seconds > replay_window:
+        if abs((_utcnow() - timestamp).total_seconds()) > replay_window:
             return 0
-
-        # Retain the nonce until the signed timestamp's complete validity
-        # interval ends, including any accepted future clock skew.
-        replay_timeout = max(
-            1,
-            math.ceil((timestamp - now).total_seconds() + replay_window),
-        )
 
         if len(agent_nonce) > 128:
             return 0
@@ -313,6 +319,9 @@ class AgentTrustMiddleware:
             request_target = request.path
             if query_string:
                 request_target = f"{request_target}?{query_string}"
+            body = self._read_request_body(request)
+            if body is None:
+                return 0
             payload = build_request_signature_payload(
                 agent_did=agent_did,
                 audience=audience,
@@ -320,13 +329,25 @@ class AgentTrustMiddleware:
                 nonce=agent_nonce,
                 method=request.method,
                 request_target=request_target,
-                body=request.body,
+                body=body,
                 content_type=request.META.get("CONTENT_TYPE", ""),
             )
             public_key.verify(sig_bytes, payload)
         except Exception:
             logger.warning("Signature verification failed for agent %s", agent_did)
             return 0
+
+        now = _utcnow()
+        age_seconds = abs((now - timestamp).total_seconds())
+        if age_seconds > replay_window:
+            return 0
+
+        # Retain the nonce until the signed timestamp's complete validity
+        # interval ends, including any accepted future clock skew.
+        replay_timeout = max(
+            1,
+            math.ceil((timestamp - now).total_seconds() + replay_window),
+        )
 
         replay_key_material = agent_did.encode("utf-8") + b"\0" + nonce_bytes
         replay_key = "agentmesh:request-nonce:" + hashlib.sha256(replay_key_material).hexdigest()
@@ -337,7 +358,33 @@ class AgentTrustMiddleware:
         except Exception:
             logger.exception("Replay cache failure while verifying agent %s", agent_did)
             return 0
+        if abs((_utcnow() - timestamp).total_seconds()) > replay_window:
+            return 0
         return 750
+
+    def _read_request_body(self, request: HttpRequest) -> bytes | None:
+        max_body_bytes = self._max_signed_body_bytes()
+        content_length = request.META.get("CONTENT_LENGTH")
+        if content_length:
+            try:
+                if int(content_length) > max_body_bytes:
+                    return None
+            except (TypeError, ValueError):
+                return None
+
+        if hasattr(request, "_body"):
+            body = request.body
+            return body if len(body) <= max_body_bytes else None
+        if request._read_started:
+            return None
+
+        body = request.read(max_body_bytes + 1)
+        request._stream.close()
+        if len(body) > max_body_bytes:
+            return None
+        request._body = body
+        request._stream = BytesIO(body)
+        return body
 
     @staticmethod
     def _resolve_view_func(request: HttpRequest) -> Callable[..., Any] | None:

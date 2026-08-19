@@ -104,7 +104,8 @@
     "shellcheck",
     "binascii",
     "locmem",
-    "altchars"
+    "altchars",
+    "filebased"
   ],
   "ignorePaths": [
     "**/node_modules/**",
