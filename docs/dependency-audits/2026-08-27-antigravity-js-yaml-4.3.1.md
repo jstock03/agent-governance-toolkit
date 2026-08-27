@@ -6,6 +6,8 @@ owner: agt-maintainers
 
 # Antigravity CLI js-yaml 4.3.1 Update
 
+<!-- cspell:ignore xmqj -->
+
 ## Which Dependencies Changed And Why
 
 - `agent-governance-antigravity-cli/package.json` updates the existing
