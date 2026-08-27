@@ -6,6 +6,8 @@ owner: agt-maintainers
 
 # Rust SDK AES 0.9.2 Lockfile Update
 
+<!-- cspell:ignore getrandom -->
+
 ## Which Dependencies Changed And Why
 
 - `agent-governance-rust/Cargo.lock` updates `aes` from `0.9.1` to `0.9.2`.
