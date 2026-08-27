@@ -6,6 +6,8 @@ owner: agt-maintainers
 
 # Claude Code js-yaml 4.3.1 Update
 
+<!-- cspell:ignore xmqj -->
+
 ## Which Dependencies Changed And Why
 
 - `agent-governance-claude-code/package.json` updates the existing transitive
