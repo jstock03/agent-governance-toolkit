@@ -1,8 +1,10 @@
 ---
 title: Copilot CLI js-yaml 4.3.1 Dependency Audit
 last_reviewed: 2026-09-02
-owner: jstock03
+owner: agt-maintainers
 ---
+
+<!-- cspell:words xmqj -->
 
 # Copilot CLI js-yaml 4.3.1 Dependency Audit
 
